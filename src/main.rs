@@ -1,10 +1,11 @@
 use std::env;
-use std::io;
 use clap::{Parser, Subcommand};
 
 mod date;
 mod task;
+mod input_service;
 use task::*;
+use input_service::InputUtils;
 
 const API_BASE_URL: &str = "http://localhost:3000";
 
@@ -60,12 +61,12 @@ impl Executable for Commands {
 
                 let data = serde_json::json!({
                     "task": {
-                        "assigner_id": input_continue::<AssignerId>("assigner_id:").value(),
-                        "content":     input_continue::<Content>("content:").value(),
-                        "due_at":      input_continue::<DueAt>("due_at:").to_string(),
-                        "description": input_continue::<Description>("description:").value(),
-                        "project_id":  input_continue::<ProjectId>("project_id:").value(),
-                        "task_state_id": input_continue::<TaskStateId>("task_state_id:").value(),
+                        "assigner_id": InputUtils::execute::<AssignerId>("assigner_id:").value(),
+                        "content":     InputUtils::execute::<Content>("content:").value(),
+                        "due_at":      InputUtils::execute::<DueAt>("due_at:").to_string(),
+                        "description": InputUtils::execute::<Description>("description:").value(),
+                        "project_id":  InputUtils::execute::<ProjectId>("project_id:").value(),
+                        "task_state_id": InputUtils::execute::<TaskStateId>("task_state_id:").value(),
                     }
                 });
 
@@ -88,31 +89,6 @@ fn print_response(res: reqwest::blocking::Response) -> Result<(), Box<dyn std::e
     println!("{}", body);
     Ok(())
 }
-
-fn input_continue<T: FromString>(title: &str) -> T {
-    let input_text = input(title); // input関数がどこかで定義されている前提
-
-    match T::new(input_text) {
-        Ok(object) => {
-            object
-        },
-        Err(e) => {
-            // 失敗：エラーを表示して再試行（結果を必ずreturnする）
-            eprintln!("入力エラー: {}", e);
-            input_continue::<T>(title)
-        }
-    }
-}
-
-fn input(string: &str) -> String {
-    let mut input = String::new();
-    println!("{}", string);
-    io::stdin()
-        .read_line(&mut input)
-        .expect("Failed to read line");
-    input.trim().to_string()
-}
-
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     dotenv::dotenv().ok();
