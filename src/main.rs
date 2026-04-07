@@ -2,6 +2,12 @@ use std::env;
 use std::io;
 use clap::{Parser, Subcommand};
 
+mod date;
+mod task;
+use task::*;
+
+const API_BASE_URL: &str = "http://localhost:3000";
+
 #[derive(Parser)]
 struct Cli {
     #[command(subcommand)]
@@ -30,13 +36,11 @@ impl Executable for Commands {
         let token = env::var("RASK_API_TOKEN")
             .map_err(|_| "環境変数 RASK_API_TOKEN が設定されていません。")?;
         
-        let base_url = "http://localhost:3000";
-
-        // 2. match の中身を整理
+            // 2. match の中身を整理
         match self {
             Commands::GetAllTasks {} => {
                 let res = client
-                    .get(&format!("{}/tasks.json?api_token={}", base_url, token))
+                    .get(&format!("{}/tasks.json?api_token={}", API_BASE_URL, token))
                     .send()?; // 送信し忘れを修正
 
                 print_response(res)?;
@@ -45,7 +49,7 @@ impl Executable for Commands {
 
             Commands::GetTask { path } => {
                 let res = client
-                    .get(&format!("{}/tasks/{}.json?api_token={}", base_url, path, token))
+                    .get(&format!("{}/tasks/{}.json?api_token={}", API_BASE_URL, path, token))
                     .send()?;
 
                 print_response(res)?;
@@ -53,18 +57,20 @@ impl Executable for Commands {
             }
 
             Commands::CreateTask {} => {
+
                 let data = serde_json::json!({
                     "task": {
-                        "assigner_id": input("assigner_id:"),
-                        "due_at":      input("due_at:"),
-                        "task_state_id": input("task_state_id:"),
-                        "content":     input("content:"),
-                        "description": input("description:"),
+                        "assigner_id": input_continue::<AssignerId>("assigner_id:").value(),
+                        "content":     input_continue::<Content>("content:").value(),
+                        "due_at":      input_continue::<DueAt>("due_at:").to_string(),
+                        "description": input_continue::<Description>("description:").value(),
+                        "project_id":  input_continue::<ProjectId>("project_id:").value(),
+                        "task_state_id": input_continue::<TaskStateId>("task_state_id:").value(),
                     }
                 });
 
                 let res = client
-                    .post(&format!("{}/tasks.json?api_token={}", base_url, token))
+                    .post(&format!("{}/tasks.json?api_token={}", API_BASE_URL, token))
                     .json(&data)
                     .send()?;
 
@@ -81,6 +87,21 @@ fn print_response(res: reqwest::blocking::Response) -> Result<(), Box<dyn std::e
     let body = res.text()?;
     println!("{}", body);
     Ok(())
+}
+
+fn input_continue<T: FromString>(title: &str) -> T {
+    let input_text = input(title); // input関数がどこかで定義されている前提
+
+    match T::new(input_text) {
+        Ok(object) => {
+            object
+        },
+        Err(e) => {
+            // 失敗：エラーを表示して再試行（結果を必ずreturnする）
+            eprintln!("入力エラー: {}", e);
+            input_continue::<T>(title)
+        }
+    }
 }
 
 fn input(string: &str) -> String {
