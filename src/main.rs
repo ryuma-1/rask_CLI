@@ -7,8 +7,6 @@ mod input_service;
 use task::*;
 use input_service::InputUtils;
 
-const API_BASE_URL: &str = "http://localhost:3000";
-
 #[derive(Parser)]
 struct Cli {
     #[command(subcommand)]
@@ -36,12 +34,14 @@ impl Executable for Commands {
         let client = reqwest::blocking::Client::new();
         let token = env::var("RASK_API_TOKEN")
             .map_err(|_| "環境変数 RASK_API_TOKEN が設定されていません。")?;
-        
+        let url = env::var("API_BASE_URL")
+            .map_err(|_| "環境変数 API_BASE_URL が設定されていません。")?;
+
             // 2. match の中身を整理
         match self {
             Commands::GetAllTasks {} => {
                 let res = client
-                    .get(&format!("{}/tasks.json?api_token={}", API_BASE_URL, token))
+                    .get(&format!("{}/tasks.json?api_token={}", url, token))
                     .send()?; // 送信し忘れを修正
 
                 print_response(res)?;
@@ -50,7 +50,7 @@ impl Executable for Commands {
 
             Commands::GetTask { path } => {
                 let res = client
-                    .get(&format!("{}/tasks/{}.json?api_token={}", API_BASE_URL, path, token))
+                    .get(&format!("{}/tasks/{}.json?api_token={}", url, path, token))
                     .send()?;
 
                 print_response(res)?;
@@ -71,7 +71,7 @@ impl Executable for Commands {
                 });
 
                 let res = client
-                    .post(&format!("{}/tasks.json?api_token={}", API_BASE_URL, token))
+                    .post(&format!("{}/tasks.json?api_token={}", url, token))
                     .json(&data)
                     .send()?;
 
