@@ -1,11 +1,13 @@
 use std::env;
 use clap::{Parser, Subcommand};
 
+mod rask_api;
 mod date;
 mod task;
 mod input_service;
 use task::*;
-use input_service::InputUtils;
+use rask_api::*;
+use crate:: input_service::InputUtils;
 
 #[derive(Parser)]
 struct Cli {
@@ -18,7 +20,7 @@ enum Commands {
     GetAllTasks {
     },
     GetTask {
-        path: i32,
+        id: i32,
     },
     CreateTask {
     },
@@ -31,28 +33,25 @@ trait Executable {
 impl Executable for Commands {
     fn execute(self) -> Result<(), Box<dyn std::error::Error>> {
         // 1. クライアントとトークンを共通で準備
-        let client = reqwest::blocking::Client::new();
         let token = env::var("RASK_API_TOKEN")
             .map_err(|_| "環境変数 RASK_API_TOKEN が設定されていません。")?;
         let url = env::var("API_BASE_URL")
             .map_err(|_| "環境変数 API_BASE_URL が設定されていません。")?;
 
+        let api = RaskApiClient::new(token, url);
+
             // 2. match の中身を整理
         match self {
             Commands::GetAllTasks {} => {
-                let res = client
-                    .get(&format!("{}/tasks.json?api_token={}", url, token))
-                    .send()?; // 送信し忘れを修正
+
+                let res = api.get_all_tasks()?;
 
                 print_response(res)?;
                 Ok(())
             }
 
-            Commands::GetTask { path } => {
-                let res = client
-                    .get(&format!("{}/tasks/{}.json?api_token={}", url, path, token))
-                    .send()?;
-
+            Commands::GetTask { id } => {
+                let res = api.get_task(id)?;
                 print_response(res)?;
                 Ok(())
             }
@@ -70,10 +69,7 @@ impl Executable for Commands {
                     }
                 });
 
-                let res = client
-                    .post(&format!("{}/tasks.json?api_token={}", url, token))
-                    .json(&data)
-                    .send()?;
+                let res = api.create_task(data)?;
 
                 print_response(res)?;
                 Ok(())
@@ -91,8 +87,7 @@ fn print_response(res: reqwest::blocking::Response) -> Result<(), Box<dyn std::e
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    dotenv::dotenv().ok();
-
+    dotenv::dotenv().ok(); // .envの読み込み
     let cli = Cli::parse();
     cli.command.execute()?;
     Ok(())
