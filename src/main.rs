@@ -5,6 +5,7 @@ mod date;
 mod task;
 mod input_service;
 mod rask_command;
+mod doc;
 
 use rask_command::*;
 

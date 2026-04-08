@@ -2,6 +2,7 @@ use std::env;
 use clap::{Subcommand};
 
 use crate::task::*;
+use crate::doc::*;
 use crate::rask_api::*;
 use crate::input_service::InputUtils;
 
@@ -13,6 +14,13 @@ pub enum RaskCommand {
         id: i32,
     },
     CreateTask {
+    },
+    GetAllDocs {
+    },
+    GetDoc {
+        id: i32,
+    },
+    CreateDoc {
     },
 }
 
@@ -33,9 +41,7 @@ impl Executable for RaskCommand {
             // 2. match の中身を整理
         match self {
             RaskCommand::GetAllTasks {} => {
-
                 let res = api.get_all_tasks()?;
-
                 print_response(res)?;
                 Ok(())
             }
@@ -64,6 +70,38 @@ impl Executable for RaskCommand {
                 print_response(res)?;
                 Ok(())
             }
+
+
+            RaskCommand::GetAllDocs {  } => {
+                let res = api.get_all_docs()?;
+                print_response(res)?;
+                Ok(())
+            }
+
+            RaskCommand::GetDoc { id } => {
+                let res = api.get_doc(id)?;
+                print_response(res)?;
+                Ok(())
+             }
+
+            RaskCommand::CreateDoc {}=> {
+                let data = serde_json::json!({
+                    "document": {
+                        "content":     InputUtils::execute::<Content>("content:").value(),
+                        "description": InputUtils::execute::<Description>("description:").value(),
+                        "project_id":  InputUtils::execute::<ProjectId>("project_id:").value(),
+                        "start_at": InputUtils::execute::<StartAt>("start_at:").to_string(),
+                        "end_at": InputUtils::execute::<EndAt>("end_at:").to_string(),
+                        "location": InputUtils::execute::<Location>("location:").to_string(),
+                    }
+                });
+
+                let res = api.create_doc(data)?;
+
+                print_response(res)?;
+                Ok(())
+            }
+
         }
     }
 }
