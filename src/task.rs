@@ -1,7 +1,16 @@
+use serde::{Deserialize, Serialize};
 use anyhow::Result;
 
-use crate::date::Date;
+use crate::date::{Date};
 
+#[derive(Deserialize, Serialize, Debug)]
+pub struct TaskReq {
+
+    #[serde(rename = "task")]
+    task: Task,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
 pub struct Task {
     assigner_id: AssignerId,
     content: Content,
@@ -11,33 +20,71 @@ pub struct Task {
     task_state_id: TaskStateId,
 }
 
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(transparent)]
 pub struct AssignerId {
     assigner_id: i32,
 }
 
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(transparent)]
 pub struct Content {
     content: String,
 }
 
+ #[derive(Deserialize, Serialize, Debug)]
+ #[serde(transparent)]
 pub struct DueAt {
     due_at: Date,
 }
 
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(transparent)]
 pub struct Description {
     description: String,
 }
 
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(transparent)]
 pub struct ProjectId {
     project_id: Option<i32>,
 }
 
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(transparent)]
 pub struct TaskStateId {
     task_state_id: i32,
 }
 
+impl TaskReq {
+    pub fn new(task: Task) -> Self {
+        Self { task }
+    }
+}
+
+impl Task {
+    pub fn new(
+        assigner_id: AssignerId,
+        content: Content,
+        due_at: DueAt,
+        description: Description,
+        project_id: ProjectId,
+        task_state_id: TaskStateId,
+    ) -> Self {
+        Self {
+            assigner_id,
+            content,
+            due_at,
+            description,
+            project_id,
+            task_state_id,
+        }
+    }
+}
+
 pub trait FromString: Sized {
     // 1. エラー型を指定し、Sized制約（またはSelf: Sized）が必要
-    fn new(s: String) -> Result<Self, String>;
+    fn new(s: &String) -> Result<Self, String>;
 
     // 2. インスタンスメソッドにするために &self を追加
     fn to_string(&self) -> String;
@@ -50,7 +97,7 @@ impl AssignerId {
 }
 
 impl FromString for AssignerId {
-    fn new(s: String) -> Result<Self, String> {
+    fn new(s: &String) -> Result<Self, String> {
         let assigner_id = s.parse().map_err(|_| "assigner_id は数値で入力してください。")?;
         Ok(Self { assigner_id })
     }
@@ -69,8 +116,8 @@ impl Content {
 
 
 impl FromString for Content {
-    fn new(s: String) -> Result<Self, String> {
-        Ok(Self { content: s })
+    fn new(s: &String) -> Result<Self, String> {
+        Ok(Self { content: s.clone() })
     }
 
     fn to_string(&self) -> String {
@@ -83,7 +130,7 @@ impl DueAt {
 }
 
 impl FromString for DueAt {
-    fn new(s: String) -> Result<Self, String> {
+    fn new(s: &String) -> Result<Self, String> {
         let parts: Vec<&str> = s.split('-').collect();
         if parts.len() != 3 {
             return Err("due_at は YYYY-MM-DD 形式で入力してください。".to_string());
@@ -115,8 +162,8 @@ impl Description {
 }
 
 impl FromString for Description {
-    fn new(s: String) -> Result<Self, String> {
-        Ok(Self { description: s })
+    fn new(s: &String) -> Result<Self, String> {
+        Ok(Self { description: s.clone() })
     }
 
     fn to_string(&self) -> String {
@@ -131,7 +178,7 @@ impl ProjectId {
 }
 
 impl FromString for ProjectId {
-    fn new(s: String) -> Result<Self, String> {
+    fn new(s: &String) -> Result<Self, String> {
     // 1. 文字列が空（または空白のみ）なら None、値があればパースを試みる
     let project_id = if s.trim().is_empty() {
         None
@@ -157,7 +204,7 @@ impl TaskStateId {
 }
 
 impl FromString for TaskStateId {
-    fn new(s: String) -> Result<Self, String> {
+    fn new(s: &String) -> Result<Self, String> {
         let task_state_id = s.parse().map_err(|_| "task_state_id は数値で入力してください。")?;
         Ok(Self { task_state_id })
     }

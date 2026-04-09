@@ -48,7 +48,6 @@ impl RaskApi for RaskApiClient {
 
     fn create_task(&self, data: serde_json::Value) -> Result<Response, Box<dyn std::error::Error>> {
 
-
         // self を付けて参照するように修正
         let res = self.client
             .post(&format!("{}/tasks.json?api_token={}", self.url, self.token))
@@ -76,10 +75,10 @@ impl RaskApi for RaskApiClient {
         Ok(res)
     }
 
-    fn create_doc(&self, data: serde_json::Value) -> Result<Response, Box<dyn std::error::Error>> {
+    fn create_doc(&self, json: serde_json::Value) -> Result<Response, Box<dyn std::error::Error>> {
         let res = self.client
             .post(&format!("{}/documents.json?api_token={}", self.url, self.token))
-            .json(&data)
+            .json(&json)
             .send()?;
 
         Ok(res)

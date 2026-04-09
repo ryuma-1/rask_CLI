@@ -10,7 +10,7 @@ impl InputUtils {
     pub fn execute<T: FromString>(title: &str) -> T {
         let input_text = Self::input(title); // 内部で自分自身の関数を呼ぶ
 
-        match T::new(input_text) {
+        match T::new(&input_text) {
             Ok(object) => object,
             Err(e) => {
                 eprintln!("入力エラー: {}", e);

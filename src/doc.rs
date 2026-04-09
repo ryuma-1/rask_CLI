@@ -1,35 +1,56 @@
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 
 use crate::date::Date;
 use crate::task::{Content, Description, FromString, ProjectId};
 
-pub struct Document {
+#[derive(Deserialize, Serialize, Debug)]
+pub struct DocReq {
+	#[serde(rename = "document")]
+	document: Doc,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct Doc {
 	content: Content,
 	description: Description,
 	project_id: ProjectId,
 	start_at: StartAt,
 	end_at: EndAt,
 	location: Location,
-	tags: Tags,
 }
 
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(transparent)]
 pub struct StartAt {
 	start_at: Date,
 }
 
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(transparent)]	
 pub struct EndAt {
 	end_at: Date,
 }
 
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(transparent)]
 pub struct Location {
 	location: String,
 }
 
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(transparent)]
 pub struct Tags {
 	tags: Vec<String>,
 }
 
-impl Document {
+impl DocReq {
+	pub fn new(document: Doc) -> Self {
+		Self { document }
+	}
+}
+
+impl Doc {
 	pub fn new(
 		content: Content,
 		description: Description,
@@ -37,7 +58,6 @@ impl Document {
 		start_at: StartAt,
 		end_at: EndAt,
 		location: Location,
-		tags: Tags,
 	) -> Self {
 		Self {
 			content,
@@ -46,7 +66,6 @@ impl Document {
 			start_at,
 			end_at,
 			location,
-			tags,
 		}
 	}
 
@@ -73,13 +92,9 @@ impl Document {
 	pub fn location(&self) -> &Location {
 		&self.location
 	}
-
-	pub fn tags(&self) -> &Tags {
-		&self.tags
-	}
 }
 
-fn parse_date(s: String, field_name: &str) -> Result<Date, String> {
+fn parse_date(s: &String, field_name: &str) -> Result<Date, String> {
 	let parts: Vec<&str> = s.split('-').collect();
 	if parts.len() != 3 {
 		return Err(format!("{} は YYYY-MM-DD 形式で入力してください。", field_name));
@@ -105,7 +120,7 @@ impl StartAt {
 }
 
 impl FromString for StartAt {
-	fn new(s: String) -> Result<Self, String> {
+	fn new(s: &String) -> Result<Self, String> {
 		let start_at = parse_date(s, "start_at")?;
 		Ok(Self { start_at })
 	}
@@ -122,7 +137,7 @@ impl EndAt {
 }
 
 impl FromString for EndAt {
-	fn new(s: String) -> Result<Self, String> {
+	fn new(s: &String) -> Result<Self, String> {
 		let end_at = parse_date(s, "end_at")?;
 		Ok(Self { end_at })
 	}
@@ -139,8 +154,8 @@ impl Location {
 }
 
 impl FromString for Location {
-	fn new(s: String) -> Result<Self, String> {
-		Ok(Self { location: s })
+	fn new(s: &String) -> Result<Self, String> {
+		Ok(Self { location: s.clone() })
 	}
 
 	fn to_string(&self) -> String {
@@ -155,7 +170,7 @@ impl Tags {
 }
 
 impl FromString for Tags {
-	fn new(s: String) -> Result<Self, String> {
+	fn new(s: &String) -> Result<Self, String> {
 		let tags = if s.trim().is_empty() {
 			Vec::new()
 		} else {

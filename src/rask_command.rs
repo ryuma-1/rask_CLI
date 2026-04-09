@@ -1,6 +1,7 @@
 use std::env;
 use clap::{Subcommand};
 
+use crate::date::Date;
 use crate::task::*;
 use crate::doc::*;
 use crate::rask_api::*;
@@ -21,6 +22,9 @@ pub enum RaskCommand {
         id: i32,
     },
     CreateDoc {
+    },
+    SearchDocByDate {
+        date_str: String,
     },
 }
 
@@ -53,19 +57,26 @@ impl Executable for RaskCommand {
             }
 
             RaskCommand::CreateTask {} => {
+                let assigner_id = InputUtils::execute::<AssignerId>("assigner_id:");
+                let content = InputUtils::execute::<Content>("content:");
+                let due_at = InputUtils::execute::<DueAt>("due_at:");
+                let description = InputUtils::execute::<Description>("description:");
+                let project_id = InputUtils::execute::<ProjectId>("project_id:");
+                let task_state_id = InputUtils::execute::<TaskStateId>("task_state_id:");
 
-                let data = serde_json::json!({
-                    "task": {
-                        "assigner_id": InputUtils::execute::<AssignerId>("assigner_id:").value(),
-                        "content":     InputUtils::execute::<Content>("content:").value(),
-                        "due_at":      InputUtils::execute::<DueAt>("due_at:").to_string(),
-                        "description": InputUtils::execute::<Description>("description:").value(),
-                        "project_id":  InputUtils::execute::<ProjectId>("project_id:").value(),
-                        "task_state_id": InputUtils::execute::<TaskStateId>("task_state_id:").value(),
-                    }
-                });
+                let task = Task::new (
+                    assigner_id,
+                    content,
+                    due_at,
+                    description,
+                    project_id,
+                    task_state_id,
+                );
 
-                let res = api.create_task(data)?;
+                let task_req = TaskReq::new(task);
+                let json = serde_json::to_value(&task_req)?;
+
+                let res = api.create_task(json)?;
 
                 print_response(res)?;
                 Ok(())
@@ -85,18 +96,37 @@ impl Executable for RaskCommand {
              }
 
             RaskCommand::CreateDoc {}=> {
-                let data = serde_json::json!({
-                    "document": {
-                        "content":     InputUtils::execute::<Content>("content:").value(),
-                        "description": InputUtils::execute::<Description>("description:").value(),
-                        "project_id":  InputUtils::execute::<ProjectId>("project_id:").value(),
-                        "start_at": InputUtils::execute::<StartAt>("start_at:").to_string(),
-                        "end_at": InputUtils::execute::<EndAt>("end_at:").to_string(),
-                        "location": InputUtils::execute::<Location>("location:").to_string(),
-                    }
-                });
+                let content = InputUtils::execute::<Content>("content:");
+                let description = InputUtils::execute::<Description>("description:");
+                let project_id = InputUtils::execute::<ProjectId>("project_id:");
+                let start_at = InputUtils::execute::<StartAt>("start_at:");
+                let end_at = InputUtils::execute::<EndAt>("end_at:");
+                let location = InputUtils::execute::<Location>("location:");
 
-                let res = api.create_doc(data)?;
+                let doc = Doc::new (
+                    content,
+                    description,
+                    project_id,
+                    start_at,
+                    end_at,
+                    location,
+                );
+
+                let doc_req = DocReq::new(doc);
+                let json = serde_json::to_value(&doc_req)?;
+
+                let res = api.create_doc(json)?;
+
+                print_response(res)?;
+                Ok(())
+            }
+
+            RaskCommand::SearchDocByDate { date_str: ds } => {
+                // ここはAPI側で日付検索のエンドポイントがある前提で実装
+                let date = <Date as FromString>::new(&ds)?;
+                let res = api.get_all_docs()?;
+
+
 
                 print_response(res)?;
                 Ok(())
