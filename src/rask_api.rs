@@ -48,7 +48,6 @@ impl RaskApi for RaskApiClient {
 
     fn create_task(&self, data: serde_json::Value) -> Result<Response, Box<dyn std::error::Error>> {
 
-        // self を付けて参照するように修正
         let res = self.client
             .post(&format!("{}/tasks.json?api_token={}", self.url, self.token))
             .json(&data)

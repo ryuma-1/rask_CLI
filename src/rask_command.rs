@@ -1,7 +1,8 @@
 use std::env;
 use clap::{Subcommand};
+use chrono::NaiveDate;
 
-use crate::date::Date;
+use crate::doc;
 use crate::task::*;
 use crate::doc::*;
 use crate::rask_api::*;
@@ -86,6 +87,8 @@ impl Executable for RaskCommand {
             RaskCommand::GetAllDocs {  } => {
                 let res = api.get_all_docs()?;
                 print_response(res)?;
+            
+                // print_response(res)?;
                 Ok(())
             }
 
@@ -103,7 +106,7 @@ impl Executable for RaskCommand {
                 let end_at = InputUtils::execute::<EndAt>("end_at:");
                 let location = InputUtils::execute::<Location>("location:");
 
-                let doc = Doc::new (
+                let doc_req = DocReq::new (
                     content,
                     description,
                     project_id,
@@ -112,7 +115,6 @@ impl Executable for RaskCommand {
                     location,
                 );
 
-                let doc_req = DocReq::new(doc);
                 let json = serde_json::to_value(&doc_req)?;
 
                 let res = api.create_doc(json)?;
@@ -123,12 +125,41 @@ impl Executable for RaskCommand {
 
             RaskCommand::SearchDocByDate { date_str: ds } => {
                 // ここはAPI側で日付検索のエンドポイントがある前提で実装
-                let date = <Date as FromString>::new(&ds)?;
+                let date: NaiveDate = ds.parse().unwrap();
                 let res = api.get_all_docs()?;
+                let doc_res : Vec<DocRes> = serde_json::from_str(&res.text()?)?;
 
+                // 指定された日が開始日であるドキュメントを取得
+                // let on_date_docs: Vec<DocRes> = doc_res.into_iter().filter(|doc| {
+                //     doc.start_at().map_or(false, |start| start.date_naive() == date)
+                // }).collect();
 
+                // if (on_date_docs.is_empty()) {
+                //     println!("指定された日付 {} に一致するドキュメントは見つかりませんでした。", date);
+                //     return Ok(());
+                // }
 
-                print_response(res)?;
+                // そのドキュメントの種類を確認
+                // let doc_type = on_date_docs[0].doc_type();
+
+                
+
+                // date に一致するドキュメントをフィルタリング
+                let filtered_docs: Vec<DocRes> = doc_res.into_iter().filter(|doc| {
+                    doc.start_at().map_or(false, |start| start.date_naive() == date)
+                }).collect();
+
+                // ドキュメント数が0件の場合のメッセージ
+                if filtered_docs.is_empty() {
+                    println!("指定された日付 {} に一致するドキュメントは見つかりませんでした。", date);
+                    return Ok(());
+                }
+
+                // フィルタリングされたurlを表示
+                for doc in filtered_docs {
+                    println!("url: {}", doc.url().value());
+                }
+
                 Ok(())
             }
 
