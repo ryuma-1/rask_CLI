@@ -321,12 +321,18 @@ impl DocUrl {
 	pub fn value(&self) -> &str {
 		&self.url
 	}
+
+	pub fn trim_json(&self) -> String {
+		self.url.strip_suffix(".json").unwrap_or(&self.url).to_string()
+	}
+
 }
 
 impl CreatorId {
 	pub fn value(&self) -> i32 {
 		self.id
 	}
+
 }
 
 impl CreatorName {

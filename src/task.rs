@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use anyhow::Result;
 
-use crate::{date::Date, doc::DocType};
+use crate::{date::Date, doc::DocType, minute::MinuteType};
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct TaskReq {
@@ -113,15 +113,15 @@ impl Content {
         self.content.clone()
     }
 
-    pub fn to_type(&self) -> DocType {
+    pub fn to_type(&self) -> MinuteType {
             let content_str = self.content.clone();
-            if content_str.contains(DocType::GN.to_string().as_str()) {
-                DocType::GN
-            } else if content_str.contains(DocType::New.to_string().as_str()) {
-                DocType::New
+            if content_str.contains(MinuteType::GN.to_string().as_str()) {
+                MinuteType::GN
+            } else if content_str.contains(MinuteType::New.to_string().as_str()) {
+                MinuteType::New
             } else {
                 // デフォルトはNewとする
-                DocType::Other
+                MinuteType::Other
             }
     }
 }

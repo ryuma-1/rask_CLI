@@ -2,8 +2,11 @@ use std::env;
 use clap::{Subcommand};
 use chrono::NaiveDate;
 use regex::Regex;
+use anyhow::{Context, Result, anyhow};
 
 use crate::doc;
+use crate::minute;
+use crate::minute::*;
 use crate::task::*;
 use crate::doc::*;
 use crate::rask_api::*;
@@ -27,7 +30,7 @@ pub enum RaskCommand {
     },
     SearchTodayDoc {
         #[arg(value_enum)]
-        doc_type: DocType,
+        m_type : MinuteType,
     },
 }
 
@@ -125,7 +128,7 @@ impl Executable for RaskCommand {
                 Ok(())
             }
 
-            RaskCommand::SearchTodayDoc { doc_type: doc_type } => {
+            RaskCommand::SearchTodayDoc { m_type } => {
                 // ここはAPI側で日付検索のエンドポイントがある前提で実装
                 // let date: NaiveDate = ds.parse().unwrap();
                 let res = api.get_all_docs()?;
@@ -133,18 +136,27 @@ impl Executable for RaskCommand {
 
                 // タイトルにGNやNewが含まれているドキュメントをフィルタリング
                 let filtered_type_docs: Vec<DocRes> = doc_res.into_iter().filter(|doc| {
-                   doc.content().to_type() == doc_type
+                   doc.content().to_type() == m_type
                 }).collect();
 
-                // 一旦コンテントのみログに出すだけにする
-                filtered_type_docs.into_iter().for_each(|doc| {
-                    println!("Content: {}", doc.content().value());
-                });
+                // 戻り値を Result<Vec<Minute>> にする
+                let minutes: Result<Vec<Minute>> = filtered_type_docs.into_iter().map(|doc| {
+                    let content = doc.content().value();
+                    let num = MinuteNum::new(&content)?; // ここで ? を使ってエラーを上に投げる
 
-                // miniteオブジェクトに変換する
+                    Ok(Minute::new(m_type, num, doc.url().clone()))
+                }).collect(); // Result の Vec を collect すると、自動的に Result<Vec> になる
 
-                // minuteオブジェクトの回数が一番大きいものを抽出する
+                // 1. まず Vec を取り出して、変数にしっかり固定する
+                let minutes_vec = minutes?; 
 
+                // 2. 変数に固定された Vec に対して iter() を呼ぶ
+                // これで Vec はこのスコープが終わるまで生存します
+                let max_minute = minutes_vec
+                    .iter()
+                    .max_by_key(|minute| minute.num().value());     
+
+                println!("{}", max_minute.unwrap().url().trim_json());           
 
                 Ok(())
             }

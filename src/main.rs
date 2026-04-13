@@ -6,6 +6,7 @@ mod task;
 mod input_service;
 mod rask_command;
 mod doc;
+mod minute;
 
 use rask_command::*;
 
