@@ -154,10 +154,16 @@ impl Executable for RaskCommand {
                 // これで Vec はこのスコープが終わるまで生存します
                 let max_minute = minutes_vec
                     .iter()
-                    .max_by_key(|minute| minute.num().value());     
+                    .max_by_key(|minute| minute.num().value());
 
-                println!("{}", max_minute.unwrap().url().trim_json());           
-
+                match max_minute {
+                    Some(minute) => {
+                        println!("{}", minute.url().trim_json());
+                    }
+                    None => {
+                        eprintln!("Error: max_minute is None"); // Ruby側で 2>&1 すれば見える
+                    }
+                }
                 Ok(())
             }
 
