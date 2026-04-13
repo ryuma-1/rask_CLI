@@ -129,10 +129,14 @@ impl Executable for RaskCommand {
             }
 
             RaskCommand::SearchTodayDoc { m_type } => {
+                println!("SearchTodayDoc: m_type = {}", m_type);
+
                 // ここはAPI側で日付検索のエンドポイントがある前提で実装
                 // let date: NaiveDate = ds.parse().unwrap();
                 let res = api.get_all_docs()?;
                 let doc_res : Vec<DocRes> = serde_json::from_str(&res.text()?)?;
+
+                println!("全ドキュメント数: {}", doc_res.len());
 
                 // タイトルにGNやNewが含まれているドキュメントをフィルタリング
                 let filtered_type_docs: Vec<DocRes> = doc_res.into_iter().filter(|doc| {

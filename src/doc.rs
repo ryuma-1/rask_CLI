@@ -98,7 +98,7 @@ pub struct ProjectName {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(transparent)]
 pub struct TagId {
-	id: String,
+	id: i32,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -354,8 +354,8 @@ impl ProjectName {
 }
 
 impl TagId {
-	pub fn value(&self) -> &str {
-		&self.id
+	pub fn value(&self) -> i32 {
+		self.id
 	}
 }
 
