@@ -1,6 +1,7 @@
 use std::env;
 use clap::{Subcommand};
 use chrono::NaiveDate;
+use regex::Regex;
 
 use crate::doc;
 use crate::task::*;
@@ -24,8 +25,9 @@ pub enum RaskCommand {
     },
     CreateDoc {
     },
-    SearchDocByDate {
-        date_str: String,
+    SearchTodayDoc {
+        #[arg(value_enum)]
+        doc_type: DocType,
     },
 }
 
@@ -123,42 +125,26 @@ impl Executable for RaskCommand {
                 Ok(())
             }
 
-            RaskCommand::SearchDocByDate { date_str: ds } => {
+            RaskCommand::SearchTodayDoc { doc_type: doc_type } => {
                 // ここはAPI側で日付検索のエンドポイントがある前提で実装
-                let date: NaiveDate = ds.parse().unwrap();
+                // let date: NaiveDate = ds.parse().unwrap();
                 let res = api.get_all_docs()?;
                 let doc_res : Vec<DocRes> = serde_json::from_str(&res.text()?)?;
 
-                // 指定された日が開始日であるドキュメントを取得
-                // let on_date_docs: Vec<DocRes> = doc_res.into_iter().filter(|doc| {
-                //     doc.start_at().map_or(false, |start| start.date_naive() == date)
-                // }).collect();
-
-                // if (on_date_docs.is_empty()) {
-                //     println!("指定された日付 {} に一致するドキュメントは見つかりませんでした。", date);
-                //     return Ok(());
-                // }
-
-                // そのドキュメントの種類を確認
-                // let doc_type = on_date_docs[0].doc_type();
-
-                
-
-                // date に一致するドキュメントをフィルタリング
-                let filtered_docs: Vec<DocRes> = doc_res.into_iter().filter(|doc| {
-                    doc.start_at().map_or(false, |start| start.date_naive() == date)
+                // タイトルにGNやNewが含まれているドキュメントをフィルタリング
+                let filtered_type_docs: Vec<DocRes> = doc_res.into_iter().filter(|doc| {
+                   doc.content().to_type() == doc_type
                 }).collect();
 
-                // ドキュメント数が0件の場合のメッセージ
-                if filtered_docs.is_empty() {
-                    println!("指定された日付 {} に一致するドキュメントは見つかりませんでした。", date);
-                    return Ok(());
-                }
+                // 一旦コンテントのみログに出すだけにする
+                filtered_type_docs.into_iter().for_each(|doc| {
+                    println!("Content: {}", doc.content().value());
+                });
 
-                // フィルタリングされたurlを表示
-                for doc in filtered_docs {
-                    println!("url: {}", doc.url().value());
-                }
+                // miniteオブジェクトに変換する
+
+                // minuteオブジェクトの回数が一番大きいものを抽出する
+
 
                 Ok(())
             }

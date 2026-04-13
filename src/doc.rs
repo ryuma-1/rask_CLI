@@ -1,6 +1,8 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use clap::ValueEnum;
+use strum::Display;
 
 
 use crate::date::Date;
@@ -32,10 +34,11 @@ pub struct DocReq {
 	location: Location,
 }
 
+#[derive(Debug, Clone, ValueEnum, PartialEq, Display)]
 pub enum DocType{
 	New,
 	GN,
-	Other,
+	Other
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -212,6 +215,7 @@ impl DocRes {
 		} else if content_str.contains("New") {
 			DocType::New
 		} else {
+			// デフォルトはNewとする
 			DocType::Other
 		}
 	}

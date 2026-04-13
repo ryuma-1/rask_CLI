@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use anyhow::Result;
 
-use crate::date::{Date};
+use crate::{date::Date, doc::DocType};
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct TaskReq {
@@ -111,6 +111,18 @@ impl FromString for AssignerId {
 impl Content {
     pub fn value(&self) -> String {
         self.content.clone()
+    }
+
+    pub fn to_type(&self) -> DocType {
+            let content_str = self.content.clone();
+            if content_str.contains(DocType::GN.to_string().as_str()) {
+                DocType::GN
+            } else if content_str.contains(DocType::New.to_string().as_str()) {
+                DocType::New
+            } else {
+                // デフォルトはNewとする
+                DocType::Other
+            }
     }
 }
 
