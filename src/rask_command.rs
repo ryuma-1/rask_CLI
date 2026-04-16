@@ -1,4 +1,5 @@
 use std::env;
+use clap::builder::Str;
 use clap::{Subcommand};
 use chrono::NaiveDate;
 use regex::Regex;
@@ -31,6 +32,10 @@ pub enum RaskCommand {
     SearchTodayDoc {
         #[arg(value_enum)]
         m_type : MinuteType,
+    },
+    SearchDocByKeyword {
+        #[arg(num_args = 1..)]
+        keywords: Vec<String>,
     },
 }
 
@@ -129,14 +134,10 @@ impl Executable for RaskCommand {
             }
 
             RaskCommand::SearchTodayDoc { m_type } => {
-                println!("SearchTodayDoc: m_type = {}", m_type);
-
                 // ここはAPI側で日付検索のエンドポイントがある前提で実装
                 // let date: NaiveDate = ds.parse().unwrap();
                 let res = api.get_all_docs()?;
                 let doc_res : Vec<DocRes> = serde_json::from_str(&res.text()?)?;
-
-                println!("全ドキュメント数: {}", doc_res.len());
 
                 // タイトルにGNやNewが含まれているドキュメントをフィルタリング
                 let filtered_type_docs: Vec<DocRes> = doc_res.into_iter().filter(|doc| {
@@ -168,6 +169,24 @@ impl Executable for RaskCommand {
                         eprintln!("Error: max_minute is None"); // Ruby側で 2>&1 すれば見える
                     }
                 }
+                Ok(())
+            }
+            RaskCommand::SearchDocByKeyword { keywords } => {
+                let res = api.get_all_docs()?;
+
+                let doc_res : Vec<DocRes> = serde_json::from_str(&res.text()?)?;
+
+                // すべてのキーワードが含まれているドキュメントをフィルタリング (AND検索)
+                let filtered_docs: Vec<DocRes> = doc_res.into_iter().filter(|doc| {
+                    keywords.iter().all(|keyword| doc.content().value().contains(keyword))
+                }).collect();
+
+                // フィルタリングしたドキュメントのJSONを表示
+                for doc in filtered_docs {
+                    let doc_json = serde_json::to_string(&doc)?;
+                    println!("{}", doc_json);
+                }
+
                 Ok(())
             }
 
