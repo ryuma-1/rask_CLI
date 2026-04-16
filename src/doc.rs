@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
@@ -49,7 +51,7 @@ pub struct Creator {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Project {
-	id: ProjectResId,
+	id: ProjectDocId,
 	name: ProjectName,
 }
 
@@ -85,7 +87,8 @@ pub struct CreatorName {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(transparent)]
-pub struct ProjectResId {
+pub struct 
+ProjectDocId {
 	id: i32,
 }
 
@@ -124,13 +127,6 @@ pub struct EndAt {
 pub struct Location {
 	location: String,
 }
-
-#[derive(Deserialize, Serialize, Debug)]
-#[serde(transparent)]
-pub struct Tags {
-	tags: Vec<String>,
-}
-
 
 impl DocReq {
 	pub fn new(
@@ -284,11 +280,11 @@ impl Creator {
 }
 
 impl Project {
-	pub fn new(id: ProjectResId, name: ProjectName) -> Self {
+	pub fn new(id: ProjectDocId, name: ProjectName) -> Self {
 		Self { id, name }
 	}
 
-	pub fn id(&self) -> &ProjectResId {
+	pub fn id(&self) -> &ProjectDocId {
 		&self.id
 	}
 
@@ -341,7 +337,7 @@ impl CreatorName {
 	}
 }
 
-impl ProjectResId {
+impl ProjectDocId {
 	pub fn value(&self) -> i32 {
 		self.id
 	}
@@ -431,31 +427,5 @@ impl FromString for Location {
 
 	fn to_string(&self) -> String {
 		self.location.clone()
-	}
-}
-
-impl Tags {
-	pub fn value(&self) -> Vec<String> {
-		self.tags.clone()
-	}
-}
-
-impl FromString for Tags {
-	fn new(s: &String) -> Result<Self, String> {
-		let tags = if s.trim().is_empty() {
-			Vec::new()
-		} else {
-			s.split(',')
-				.map(|tag| tag.trim())
-				.filter(|tag| !tag.is_empty())
-				.map(|tag| tag.to_string())
-				.collect()
-		};
-
-		Ok(Self { tags })
-	}
-
-	fn to_string(&self) -> String {
-		self.tags.join(",")
 	}
 }
