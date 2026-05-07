@@ -64,7 +64,7 @@ pub struct Tag {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(transparent)]
 pub struct DocId {
-	id: i32,
+	id: u32,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -76,7 +76,7 @@ pub struct DocUrl {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(transparent)]
 pub struct CreatorId {
-	id: i32,
+	id: u32,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -89,7 +89,7 @@ pub struct CreatorName {
 #[serde(transparent)]
 pub struct 
 ProjectDocId {
-	id: i32,
+	id: u32,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -101,7 +101,7 @@ pub struct ProjectName {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(transparent)]
 pub struct TagId {
-	id: i32,
+	id: u32,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
@@ -308,7 +308,7 @@ impl Tag {
 }
 
 impl DocId {
-	pub fn value(&self) -> i32 {
+	pub fn value(&self) -> u32 {
 		self.id
 	}
 }
@@ -325,7 +325,7 @@ impl DocUrl {
 }
 
 impl CreatorId {
-	pub fn value(&self) -> i32 {
+	pub fn value(&self) -> u32 {
 		self.id
 	}
 
@@ -338,7 +338,7 @@ impl CreatorName {
 }
 
 impl ProjectDocId {
-	pub fn value(&self) -> i32 {
+	pub fn value(&self) -> u32 {
 		self.id
 	}
 }
@@ -350,7 +350,7 @@ impl ProjectName {
 }
 
 impl TagId {
-	pub fn value(&self) -> i32 {
+	pub fn value(&self) -> u32 {
 		self.id
 	}
 }

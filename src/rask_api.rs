@@ -1,12 +1,12 @@
 use reqwest::blocking::{Client, Response}; // Responseを明示的にインポート
 
 pub trait RaskApi {
-    fn get_all_tasks(&self) -> Result<Response, Box<dyn std::error::Error>>;
-    fn get_task(&self, path: i32) -> Result<Response, Box<dyn std::error::Error>>;
-    fn create_task(&self, data: serde_json::Value) -> Result<Response, Box<dyn std::error::Error>>;
-    fn get_all_docs(&self) -> Result<Response, Box<dyn std::error::Error>>;
-    fn get_doc(&self, path: i32) -> Result<Response, Box<dyn std::error::Error>>;
-    fn create_doc(&self, data: serde_json::Value) -> Result<Response, Box<dyn std::error::Error>>;
+    fn get_all_tasks(&self) -> anyhow::Result<(Response)>;
+    fn get_task(&self, path: i32) -> anyhow::Result<(Response)>;
+    fn create_task(&self, data: serde_json::Value) -> anyhow::Result<(Response)>;
+    fn get_all_docs(&self) -> anyhow::Result<(Response)>;
+    fn get_doc(&self, path: i32) -> anyhow::Result<(Response)>;
+    fn create_doc(&self, data: serde_json::Value) -> anyhow::Result<(Response)>;
 }
 
 // 命名規則を PascalCase に変更
@@ -28,8 +28,8 @@ impl RaskApiClient {
 }
 
 impl RaskApi for RaskApiClient {
-    fn get_all_tasks(&self) -> Result<Response, Box<dyn std::error::Error>> {
-        let res = self
+    fn get_all_tasks(&self) -> anyhow::Result<(Response)> {
+        let res: Response = self
             .client
             .get(&format!("{}/tasks.json?api_token={}", self.url, self.token))
             .send()?;
@@ -37,7 +37,7 @@ impl RaskApi for RaskApiClient {
         Ok(res)
     }
 
-    fn get_task(&self, path: i32) -> Result<Response, Box<dyn std::error::Error>> {
+    fn get_task(&self, path: i32) -> anyhow::Result<(Response)> {
         let res = self
             .client
             .get(&format!("{}/tasks/{}.json?api_token={}", self.url, path, self.token))
@@ -46,7 +46,7 @@ impl RaskApi for RaskApiClient {
         Ok(res)
     }
 
-    fn create_task(&self, data: serde_json::Value) -> Result<Response, Box<dyn std::error::Error>> {
+    fn create_task(&self, data: serde_json::Value) -> anyhow::Result<(Response)> {
 
         let res = self.client
             .post(&format!("{}/tasks.json?api_token={}", self.url, self.token))
@@ -56,7 +56,7 @@ impl RaskApi for RaskApiClient {
         Ok(res)
     }
 
-    fn get_all_docs(&self) -> Result<Response, Box<dyn std::error::Error>> {
+    fn get_all_docs(&self) -> anyhow::Result<(Response)> {
         let res = self
             .client
             .get(&format!("{}/documents.json?api_token={}", self.url, self.token))
@@ -65,7 +65,7 @@ impl RaskApi for RaskApiClient {
         Ok(res)
     }
 
-    fn get_doc(&self, path: i32) -> Result<Response, Box<dyn std::error::Error>> {
+    fn get_doc(&self, path: i32) -> anyhow::Result<(Response)> {
         let res = self
             .client
             .get(&format!("{}/documents/{}.json?api_token={}", self.url, path, self.token))
@@ -74,7 +74,7 @@ impl RaskApi for RaskApiClient {
         Ok(res)
     }
 
-    fn create_doc(&self, json: serde_json::Value) -> Result<Response, Box<dyn std::error::Error>> {
+    fn create_doc(&self, json: serde_json::Value) -> anyhow::Result<(Response)> {
         let res = self.client
             .post(&format!("{}/documents.json?api_token={}", self.url, self.token))
             .json(&json)

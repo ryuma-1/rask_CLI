@@ -3,7 +3,8 @@ use clap::builder::Str;
 use clap::{Subcommand};
 use chrono::NaiveDate;
 use regex::Regex;
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Ok, Result, anyhow};
+use chrono::{DateTime, Utc};
 
 use crate::doc;
 use crate::minute;
@@ -37,19 +38,53 @@ pub enum RaskCommand {
         #[arg(num_args = 1..)]
         keywords: Vec<String>,
     },
+    SearchDoc {
+        #[arg(long)]
+        id : Option<u32>,
+
+        #[arg(long)]
+        content : Vec<String>,
+
+        #[arg(long)]
+        creator_id : Option<u32>,
+
+        #[arg(long)]
+        creator_name : Vec<String>,
+
+        #[arg(long)]
+        description : Vec<String>,
+
+        #[arg(long)]
+        created_at : Option<DateTime<Utc>>,
+
+        #[arg(long)]
+        updated_at : Option<DateTime<Utc>>,
+
+        #[arg(long)]
+        project_id : Option<u32>,
+
+        #[arg(long)]
+        project_name : Vec<String>,
+
+        #[arg(long)]
+        start_at : Option<DateTime<Utc>>,
+
+        #[arg(long)]
+        end_at : Option<DateTime<Utc>>,
+    }
 }
 
 pub trait Executable {
-    fn execute(self) -> Result<(), Box<dyn std::error::Error>>;
+    fn execute(self) -> anyhow::Result<()>;
 }
 
 impl Executable for RaskCommand {
-    fn execute(self) -> Result<(), Box<dyn std::error::Error>> {
+    fn execute(self) -> anyhow::Result<()> {
         // 1. クライアントとトークンを共通で準備
         let token = env::var("RASK_API_TOKEN")
-            .map_err(|_| "環境変数 RASK_API_TOKEN が設定されていません。")?;
+            .map_err(|_| anyhow::anyhow!("環境変数 RASK_API_TOKEN が設定されていません。"))?;
         let url = env::var("API_BASE_URL")
-            .map_err(|_| "環境変数 API_BASE_URL が設定されていません。")?;
+            .map_err(|_| anyhow::anyhow!("環境変数 API_BASE_URL が設定されていません。"))?;
 
         let api = RaskApiClient::new(token, url);
 
@@ -190,12 +225,45 @@ impl Executable for RaskCommand {
                 Ok(())
             }
 
+            RaskCommand::SearchDoc { id, content, creator_id, creator_name, description, created_at, updated_at, project_id, project_name, start_at, end_at } => {
+                let res = api.get_all_docs()?;
+
+                let doc_res : Vec<DocRes> = serde_json::from_str(&res.text()?)?;
+
+                // すべての条件を満たすドキュメントをフィルタリング (AND検索)
+                let filtered_docs: Vec<DocRes> = doc_res.into_iter().filter(|doc| {
+                    (id.is_none() || id == Some(doc.id().value())) &&
+                    (content.is_empty() || content.iter().all(|kw| doc.content().value().contains(kw))) &&
+                    (creator_id.is_none() || creator_id == Some(doc.creator().id().value())) &&
+                    (creator_name.is_empty() || creator_name.iter().all(|kw| doc.creator().name().value().contains(kw))) &&
+                    (description.is_empty() || description.iter().all(|kw| doc.description().map_or(false, |d| d.value().contains(kw)))) &&
+                    (created_at.is_none() || created_at == Some(*doc.created_at())) &&
+                    (updated_at.is_none() || updated_at == Some(*doc.updated_at())) &&
+                    (project_id.is_none() || project_id == Some(doc.project().map_or(0, |p| p.id().value()))) &&
+                    (project_name.is_empty() || project_name.iter().all(|kw| doc.project().map_or(false, |p| p.name().value().contains(kw)))) &&
+                    (start_at.is_none() || start_at == Some(doc.start_at().map_or(Utc::now(), |s| *s))) &&
+                    (end_at.is_none() || end_at == Some(doc.end_at().map_or(Utc::now(), |   e| *e)))
+                }).collect();
+
+                if filtered_docs.is_empty() {
+                    eprintln!("No documents found matching the criteria.");
+                    return Ok(());
+                }
+
+                // フィルタリングしたドキュメントのJSONを表示
+                for doc in filtered_docs {
+                    let doc_json = serde_json::to_string(&doc)?;
+                    println!("{}", doc_json);
+                }
+
+                Ok(())
+            }
         }
     }
 }
 
 // レスポンス表示用の共通関数を作るとスッキリします
-fn print_response(res: reqwest::blocking::Response) -> Result<(), Box<dyn std::error::Error>> {
+fn print_response(res: reqwest::blocking::Response) -> anyhow::Result<()> {
     println!("Status: {}", res.status());
     let body = res.text()?;
     println!("{}", body);
