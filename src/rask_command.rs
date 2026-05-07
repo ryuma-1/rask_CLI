@@ -1,4 +1,5 @@
 use std::env;
+use std::f32::consts::E;
 use clap::builder::Str;
 use clap::{Subcommand};
 use chrono::NaiveDate;
@@ -71,6 +72,12 @@ pub enum RaskCommand {
 
         #[arg(long)]
         end_at : Option<DateTime<Utc>>,
+
+        #[arg(long)]
+        term_day : Option<u32>,
+
+        #[arg(long, default_value_t = false)]
+        is_json : bool,
     }
 }
 
@@ -225,7 +232,7 @@ impl Executable for RaskCommand {
                 Ok(())
             }
 
-            RaskCommand::SearchDoc { id, content, creator_id, creator_name, description, created_at, updated_at, project_id, project_name, start_at, end_at } => {
+            RaskCommand::SearchDoc { id, content, creator_id, creator_name, description, created_at, updated_at, project_id, project_name, start_at, end_at, term_day, is_json } => {
                 let res = api.get_all_docs()?;
 
                 let doc_res : Vec<DocRes> = serde_json::from_str(&res.text()?)?;
@@ -237,23 +244,51 @@ impl Executable for RaskCommand {
                     (creator_id.is_none() || creator_id == Some(doc.creator().id().value())) &&
                     (creator_name.is_empty() || creator_name.iter().all(|kw| doc.creator().name().value().contains(kw))) &&
                     (description.is_empty() || description.iter().all(|kw| doc.description().map_or(false, |d| d.value().contains(kw)))) &&
-                    (created_at.is_none() || created_at == Some(*doc.created_at())) &&
-                    (updated_at.is_none() || updated_at == Some(*doc.updated_at())) &&
                     (project_id.is_none() || project_id == Some(doc.project().map_or(0, |p| p.id().value()))) &&
-                    (project_name.is_empty() || project_name.iter().all(|kw| doc.project().map_or(false, |p| p.name().value().contains(kw)))) &&
-                    (start_at.is_none() || start_at == Some(doc.start_at().map_or(Utc::now(), |s| *s))) &&
-                    (end_at.is_none() || end_at == Some(doc.end_at().map_or(Utc::now(), |   e| *e)))
+                    (project_name.is_empty() || project_name.iter().all(|kw| doc.project().map_or(false, |p| p.name().value().contains(kw))))
                 }).collect();
 
-                if filtered_docs.is_empty() {
+                // term_day に設定した日数の前後 term_day で絞り込む
+                let date_filtered_docs: Vec<DocRes>;
+                if term_day.is_some() {
+                    let term_duration = chrono::Duration::days(term_day.unwrap() as i64);
+                    date_filtered_docs = filtered_docs.into_iter().filter(|doc| {
+                        (created_at.is_none() || created_at.map_or(false, |ca| ca - term_duration <= *doc.created_at() && *doc.created_at() <= ca + term_duration)) &&
+                        (updated_at.is_none() || updated_at.map_or(false, |ua| ua - term_duration <= *doc.updated_at() && *doc.updated_at() <= ua + term_duration)) &&
+                        (start_at.is_none() || start_at.map_or(false, |sa| sa - term_duration <= doc.start_at().copied().unwrap_or_default() && doc.start_at().copied().unwrap_or_default() <= sa + term_duration)) &&
+                        (end_at.is_none() || end_at.map_or(false, |ea| ea - term_duration <= doc.end_at().copied().unwrap() && doc.end_at().copied().unwrap() <= ea + term_duration))
+                    }).collect();
+                } else {
+                    date_filtered_docs = filtered_docs.into_iter().filter(|doc| {
+                        (created_at.is_none() || created_at.map_or(false, |ca| *doc.created_at() == ca)) &&
+                        (updated_at.is_none() || updated_at.map_or(false, |ua| *doc.updated_at() == ua)) &&
+                        (start_at.is_none() || start_at.map_or(false, |sa| doc.start_at().map_or(false, |dsa| *dsa == sa))) &&
+                        (end_at.is_none() || end_at.map_or(false, |ea| doc.end_at().map_or(false, |dea| *dea == ea)))
+                    }).collect();
+                }
+
+                if date_filtered_docs.is_empty() {
                     eprintln!("No documents found matching the criteria.");
                     return Ok(());
                 }
 
-                // フィルタリングしたドキュメントのJSONを表示
-                for doc in filtered_docs {
-                    let doc_json = serde_json::to_string(&doc)?;
-                    println!("{}", doc_json);
+                println!("Found {} documents matching the criteria:", date_filtered_docs.len());
+
+                if is_json {
+                    // フィルタリングしたドキュメントのJSONを表示
+                    for doc in date_filtered_docs {
+                        let doc_json = serde_json::to_string(&doc)?;
+                        println!("{}", doc_json);
+                    }
+                } else {
+                    // ターミナルで見やすい形式で表示
+                    for doc in date_filtered_docs {
+                        println!("ID: {}", doc.id().value());
+                        println!("Content: {}", doc.content().value());
+                        println!("Creator: {} (ID: {})", doc.creator().name().value(), doc.creator().id().value());
+                        println!("Start At: {}", doc.start_at().map_or("None".to_string(), |sa| sa.to_string()));
+                        println!("End At: {}", doc.end_at().map_or("None".to_string(), |ea| ea.to_string()));                        
+                    }
                 }
 
                 Ok(())

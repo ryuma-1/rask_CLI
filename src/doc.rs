@@ -245,7 +245,10 @@ impl DocRes {
 	}
 
 	pub fn start_at(&self) -> Option<&DateTime<Utc>> {
-		self.start_at.as_ref()
+		match self.start_at {
+			Some(ref start_at) => Some(start_at),
+			None => None,
+		}
 	}
 
 	pub fn end_at(&self) -> Option<&DateTime<Utc>> {
