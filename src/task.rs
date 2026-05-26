@@ -1,11 +1,10 @@
-use serde::{Deserialize, Serialize};
 use anyhow::Result;
+use serde::{Deserialize, Serialize};
 
 use crate::{date::Date, doc::DocType, minute::MinuteType};
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct TaskReq {
-
     #[serde(rename = "task")]
     task: Task,
 }
@@ -32,8 +31,8 @@ pub struct Content {
     content: String,
 }
 
- #[derive(Deserialize, Serialize, Debug)]
- #[serde(transparent)]
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(transparent)]
 pub struct DueAt {
     due_at: Date,
 }
@@ -98,7 +97,9 @@ impl AssignerId {
 
 impl FromString for AssignerId {
     fn new(s: &String) -> Result<Self, String> {
-        let assigner_id = s.parse().map_err(|_| "assigner_id は数値で入力してください。")?;
+        let assigner_id = s
+            .parse()
+            .map_err(|_| "assigner_id は数値で入力してください。")?;
         Ok(Self { assigner_id })
     }
 
@@ -107,25 +108,11 @@ impl FromString for AssignerId {
     }
 }
 
-
 impl Content {
     pub fn value(&self) -> String {
         self.content.clone()
     }
-
-    pub fn to_type(&self) -> MinuteType {
-            let content_str = self.content.clone();
-            if content_str.contains(MinuteType::GN.to_string().as_str()) {
-                MinuteType::GN
-            } else if content_str.contains(MinuteType::New.to_string().as_str()) {
-                MinuteType::New
-            } else {
-                // デフォルトはNewとする
-                MinuteType::Other
-            }
-    }
 }
-
 
 impl FromString for Content {
     fn new(s: &String) -> Result<Self, String> {
@@ -137,9 +124,7 @@ impl FromString for Content {
     }
 }
 
-impl DueAt {
-
-}
+impl DueAt {}
 
 impl FromString for DueAt {
     fn new(s: &String) -> Result<Self, String> {
@@ -175,7 +160,9 @@ impl Description {
 
 impl FromString for Description {
     fn new(s: &String) -> Result<Self, String> {
-        Ok(Self { description: s.clone() })
+        Ok(Self {
+            description: s.clone(),
+        })
     }
 
     fn to_string(&self) -> String {
@@ -191,18 +178,19 @@ impl ProjectId {
 
 impl FromString for ProjectId {
     fn new(s: &String) -> Result<Self, String> {
-    // 1. 文字列が空（または空白のみ）なら None、値があればパースを試みる
-    let project_id = if s.trim().is_empty() {
-        None
-    } else {
-        // 2. 数値としてパースし、失敗したらエラーメッセージを返す
-        let val = s.parse::<i32>()
-            .map_err(|_| "project_id は数値で入力してください。")?;
-        Some(val)
-    };
+        // 1. 文字列が空（または空白のみ）なら None、値があればパースを試みる
+        let project_id = if s.trim().is_empty() {
+            None
+        } else {
+            // 2. 数値としてパースし、失敗したらエラーメッセージを返す
+            let val = s
+                .parse::<i32>()
+                .map_err(|_| "project_id は数値で入力してください。")?;
+            Some(val)
+        };
 
-    Ok(Self { project_id })
-}
+        Ok(Self { project_id })
+    }
 
     fn to_string(&self) -> String {
         self.project_id.map_or_else(|| "".into(), |v| v.to_string())
@@ -217,7 +205,9 @@ impl TaskStateId {
 
 impl FromString for TaskStateId {
     fn new(s: &String) -> Result<Self, String> {
-        let task_state_id = s.parse().map_err(|_| "task_state_id は数値で入力してください。")?;
+        let task_state_id = s
+            .parse()
+            .map_err(|_| "task_state_id は数値で入力してください。")?;
         Ok(Self { task_state_id })
     }
 
@@ -225,4 +215,3 @@ impl FromString for TaskStateId {
         self.task_state_id.to_string()
     }
 }
-

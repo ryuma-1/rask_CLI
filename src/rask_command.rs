@@ -134,13 +134,13 @@ impl Executable for RaskCommand {
                         .filter(|doc| {
                         // 1. 本文（コンテンツ）のAND検索
                             (content.is_empty()
-                            || content.iter().all(|kw| doc.content().value().contains(kw)))
+                            || doc.content().is_match(&content))
 
                         // 2. 作成者IDの一致（Option型同士の比較はシンプルにするのが一番！）
                         && (creator_id.is_none()
                             || creator_id == Some(doc.creator().id().value()))
 
-                        // 3. 作成者名のAND検索（.iter() のタイポを修正）
+                        // 3. 作成者名のAND検索
                         && (creator_name.is_empty()
                             || creator_name.iter().all(|kw| doc.creator().name().value().contains(kw)))
 
