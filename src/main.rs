@@ -1,12 +1,13 @@
-use clap::{Parser};
+use anyhow::Result;
+use clap::Parser;
 
-mod rask_api;
 mod date;
-mod task;
-mod input_service;
-mod rask_command;
 mod doc;
+mod input_service;
 mod minute;
+mod rask_api;
+mod rask_command;
+mod task;
 
 use rask_command::*;
 
@@ -16,10 +17,9 @@ struct Cli {
     command: RaskCommand,
 }
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    dotenv::dotenv().ok(); // .envの読み込み
+fn main() -> Result<()> {
+    dotenv::dotenv()?;
     let cli = Cli::parse();
     cli.command.execute()?;
     Ok(())
 }
-

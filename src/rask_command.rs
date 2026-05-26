@@ -1,11 +1,10 @@
 use std::env;
 use std::f32::consts::E;
 use clap::builder::Str;
-use clap::{Subcommand};
-use chrono::NaiveDate;
+use clap::Subcommand;
 use regex::Regex;
 use anyhow::{Context, Ok, Result, anyhow};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Utc, NaiveDate};
 
 use crate::doc;
 use crate::minute;
@@ -77,7 +76,7 @@ pub enum RaskCommand {
         term_day : Option<u32>,
 
         #[arg(long, default_value_t = false)]
-        is_json : bool,
+        is_visual : bool,
     }
 }
 
@@ -139,7 +138,6 @@ impl Executable for RaskCommand {
             RaskCommand::GetAllDocs {  } => {
                 let res = api.get_all_docs()?;
                 print_response(res)?;
-            
                 // print_response(res)?;
                 Ok(())
             }
@@ -232,7 +230,7 @@ impl Executable for RaskCommand {
                 Ok(())
             }
 
-            RaskCommand::SearchDoc { id, content, creator_id, creator_name, description, created_at, updated_at, project_id, project_name, start_at, end_at, term_day, is_json } => {
+            RaskCommand::SearchDoc { id, content, creator_id, creator_name, description, created_at, updated_at, project_id, project_name, start_at, end_at, term_day, is_visual } => {
                 let res = api.get_all_docs()?;
 
                 let doc_res : Vec<DocRes> = serde_json::from_str(&res.text()?)?;
@@ -272,15 +270,18 @@ impl Executable for RaskCommand {
                     return Ok(());
                 }
 
-                println!("Found {} documents matching the criteria:", date_filtered_docs.len());
+                
+                if !is_visual {
+                    // 1. フィルタリングされたドキュメントをコレクション（Vec）としてまとめる
+                    let collected_docs: Vec<_> = date_filtered_docs.into_iter().collect();
 
-                if is_json {
-                    // フィルタリングしたドキュメントのJSONを表示
-                    for doc in date_filtered_docs {
-                        let doc_json = serde_json::to_string(&doc)?;
-                        println!("{}", doc_json);
-                    }
+                    // 2. 配列全体をJSON文字列に変換する
+                    let json_array = serde_json::to_string(&collected_docs)?;
+
+                    // 3. 出力
+                    println!("{}", json_array);
                 } else {
+                    println!("Found {} documents matching the criteria:", date_filtered_docs.len());
                     // ターミナルで見やすい形式で表示
                     for doc in date_filtered_docs {
                         println!("ID: {}", doc.id().value());
