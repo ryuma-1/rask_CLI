@@ -1,38 +1,34 @@
-use std::env;
-use std::f32::consts::E;
+use anyhow::{anyhow, Context, Ok, Result};
+use chrono::{DateTime, NaiveDate, Utc};
 use clap::builder::Str;
 use clap::Subcommand;
 use regex::Regex;
-use anyhow::{Context, Ok, Result, anyhow};
-use chrono::{DateTime, Utc, NaiveDate};
+use std::env;
+use std::f32::consts::E;
 
 use crate::doc;
+use crate::doc::*;
+use crate::input_service::InputUtils;
 use crate::minute;
 use crate::minute::*;
-use crate::task::*;
-use crate::doc::*;
 use crate::rask_api::*;
-use crate::input_service::InputUtils;
+use crate::task::*;
 
-#[derive(Subcommand)]
+#[derive(Subcommand, Debug)]
 pub enum RaskCommand {
-    GetAllTasks {
-    },
+    GetAllTasks {},
     GetTask {
         id: i32,
     },
-    CreateTask {
-    },
-    GetAllDocs {
-    },
+    CreateTask {},
+    GetAllDocs {},
     GetDoc {
         id: i32,
     },
-    CreateDoc {
-    },
+    CreateDoc {},
     SearchTodayDoc {
         #[arg(value_enum)]
-        m_type : MinuteType,
+        m_type: MinuteType,
     },
     SearchDocByKeyword {
         #[arg(num_args = 1..)]
@@ -40,44 +36,44 @@ pub enum RaskCommand {
     },
     SearchDoc {
         #[arg(long)]
-        id : Option<u32>,
+        id: Option<u32>,
 
         #[arg(long)]
-        content : Vec<String>,
+        content: Vec<String>,
 
         #[arg(long)]
-        creator_id : Option<u32>,
+        creator_id: Option<u32>,
 
         #[arg(long)]
-        creator_name : Vec<String>,
+        creator_name: Vec<String>,
 
         #[arg(long)]
-        description : Vec<String>,
+        description: Vec<String>,
 
         #[arg(long)]
-        created_at : Option<DateTime<Utc>>,
+        created_at: Option<DateTime<Utc>>,
 
         #[arg(long)]
-        updated_at : Option<DateTime<Utc>>,
+        updated_at: Option<DateTime<Utc>>,
 
         #[arg(long)]
-        project_id : Option<u32>,
+        project_id: Option<u32>,
 
         #[arg(long)]
-        project_name : Vec<String>,
+        project_name: Vec<String>,
 
         #[arg(long)]
-        start_at : Option<DateTime<Utc>>,
+        start_at: Option<DateTime<Utc>>,
 
         #[arg(long)]
-        end_at : Option<DateTime<Utc>>,
+        end_at: Option<DateTime<Utc>>,
 
         #[arg(long)]
-        term_day : Option<u32>,
+        term_day: Option<u32>,
 
         #[arg(long, default_value_t = false)]
-        is_visual : bool,
-    }
+        is_visual: bool,
+    },
 }
 
 pub trait Executable {
@@ -94,7 +90,7 @@ impl Executable for RaskCommand {
 
         let api = RaskApiClient::new(token, url);
 
-            // 2. match の中身を整理
+        // 2. match の中身を整理
         match self {
             RaskCommand::GetAllTasks {} => {
                 let res = api.get_all_tasks()?;
@@ -116,7 +112,7 @@ impl Executable for RaskCommand {
                 let project_id = InputUtils::execute::<ProjectId>("project_id:");
                 let task_state_id = InputUtils::execute::<TaskStateId>("task_state_id:");
 
-                let task = Task::new (
+                let task = Task::new(
                     assigner_id,
                     content,
                     due_at,
@@ -134,8 +130,7 @@ impl Executable for RaskCommand {
                 Ok(())
             }
 
-
-            RaskCommand::GetAllDocs {  } => {
+            RaskCommand::GetAllDocs {} => {
                 let res = api.get_all_docs()?;
                 print_response(res)?;
                 // print_response(res)?;
@@ -146,9 +141,9 @@ impl Executable for RaskCommand {
                 let res = api.get_doc(id)?;
                 print_response(res)?;
                 Ok(())
-             }
+            }
 
-            RaskCommand::CreateDoc {}=> {
+            RaskCommand::CreateDoc {} => {
                 let content = InputUtils::execute::<Content>("content:");
                 let description = InputUtils::execute::<Description>("description:");
                 let project_id = InputUtils::execute::<ProjectId>("project_id:");
@@ -156,14 +151,8 @@ impl Executable for RaskCommand {
                 let end_at = InputUtils::execute::<EndAt>("end_at:");
                 let location = InputUtils::execute::<Location>("location:");
 
-                let doc_req = DocReq::new (
-                    content,
-                    description,
-                    project_id,
-                    start_at,
-                    end_at,
-                    location,
-                );
+                let doc_req =
+                    DocReq::new(content, description, project_id, start_at, end_at, location);
 
                 let json = serde_json::to_value(&doc_req)?;
 
@@ -177,29 +166,31 @@ impl Executable for RaskCommand {
                 // ここはAPI側で日付検索のエンドポイントがある前提で実装
                 // let date: NaiveDate = ds.parse().unwrap();
                 let res = api.get_all_docs()?;
-                let doc_res : Vec<DocRes> = serde_json::from_str(&res.text()?)?;
+                let doc_res: Vec<DocRes> = serde_json::from_str(&res.text()?)?;
 
                 // タイトルにGNやNewが含まれているドキュメントをフィルタリング
-                let filtered_type_docs: Vec<DocRes> = doc_res.into_iter().filter(|doc| {
-                   doc.content().to_type() == m_type
-                }).collect();
+                let filtered_type_docs: Vec<DocRes> = doc_res
+                    .into_iter()
+                    .filter(|doc| doc.content().to_type() == m_type)
+                    .collect();
 
                 // 戻り値を Result<Vec<Minute>> にする
-                let minutes: Result<Vec<Minute>> = filtered_type_docs.into_iter().map(|doc| {
-                    let content = doc.content().value();
-                    let num = MinuteNum::new(&content)?; // ここで ? を使ってエラーを上に投げる
+                let minutes: Result<Vec<Minute>> = filtered_type_docs
+                    .into_iter()
+                    .map(|doc| {
+                        let content = doc.content().value();
+                        let num = MinuteNum::new(&content)?; // ここで ? を使ってエラーを上に投げる
 
-                    Ok(Minute::new(m_type, num, doc.url().clone()))
-                }).collect(); // Result の Vec を collect すると、自動的に Result<Vec> になる
+                        Ok(Minute::new(m_type, num, doc.url().clone()))
+                    })
+                    .collect(); // Result の Vec を collect すると、自動的に Result<Vec> になる
 
                 // 1. まず Vec を取り出して、変数にしっかり固定する
-                let minutes_vec = minutes?; 
+                let minutes_vec = minutes?;
 
                 // 2. 変数に固定された Vec に対して iter() を呼ぶ
                 // これで Vec はこのスコープが終わるまで生存します
-                let max_minute = minutes_vec
-                    .iter()
-                    .max_by_key(|minute| minute.num().value());
+                let max_minute = minutes_vec.iter().max_by_key(|minute| minute.num().value());
 
                 match max_minute {
                     Some(minute) => {
@@ -214,12 +205,17 @@ impl Executable for RaskCommand {
             RaskCommand::SearchDocByKeyword { keywords } => {
                 let res = api.get_all_docs()?;
 
-                let doc_res : Vec<DocRes> = serde_json::from_str(&res.text()?)?;
+                let doc_res: Vec<DocRes> = serde_json::from_str(&res.text()?)?;
 
                 // すべてのキーワードが含まれているドキュメントをフィルタリング (AND検索)
-                let filtered_docs: Vec<DocRes> = doc_res.into_iter().filter(|doc| {
-                    keywords.iter().all(|keyword| doc.content().value().contains(keyword))
-                }).collect();
+                let filtered_docs: Vec<DocRes> = doc_res
+                    .into_iter()
+                    .filter(|doc| {
+                        keywords
+                            .iter()
+                            .all(|keyword| doc.content().value().contains(keyword))
+                    })
+                    .collect();
 
                 // フィルタリングしたドキュメントのJSONを表示
                 for doc in filtered_docs {
@@ -230,39 +226,101 @@ impl Executable for RaskCommand {
                 Ok(())
             }
 
-            RaskCommand::SearchDoc { id, content, creator_id, creator_name, description, created_at, updated_at, project_id, project_name, start_at, end_at, term_day, is_visual } => {
+            RaskCommand::SearchDoc {
+                id,
+                content,
+                creator_id,
+                creator_name,
+                description,
+                created_at,
+                updated_at,
+                project_id,
+                project_name,
+                start_at,
+                end_at,
+                term_day,
+                is_visual,
+            } => {
                 let res = api.get_all_docs()?;
 
-                let doc_res : Vec<DocRes> = serde_json::from_str(&res.text()?)?;
+                let doc_res: Vec<DocRes> = serde_json::from_str(&res.text()?)?;
 
                 // すべての条件を満たすドキュメントをフィルタリング (AND検索)
-                let filtered_docs: Vec<DocRes> = doc_res.into_iter().filter(|doc| {
-                    (id.is_none() || id == Some(doc.id().value())) &&
-                    (content.is_empty() || content.iter().all(|kw| doc.content().value().contains(kw))) &&
-                    (creator_id.is_none() || creator_id == Some(doc.creator().id().value())) &&
-                    (creator_name.is_empty() || creator_name.iter().all(|kw| doc.creator().name().value().contains(kw))) &&
-                    (description.is_empty() || description.iter().all(|kw| doc.description().map_or(false, |d| d.value().contains(kw)))) &&
-                    (project_id.is_none() || project_id == Some(doc.project().map_or(0, |p| p.id().value()))) &&
-                    (project_name.is_empty() || project_name.iter().all(|kw| doc.project().map_or(false, |p| p.name().value().contains(kw))))
-                }).collect();
+                let filtered_docs: Vec<DocRes> = doc_res
+                    .into_iter()
+                    .filter(|doc| {
+                        (id.is_none() || id == Some(doc.id().value()))
+                            && (content.is_empty()
+                                || content.iter().all(|kw| doc.content().value().contains(kw)))
+                            && (creator_id.is_none()
+                                || creator_id == Some(doc.creator().id().value()))
+                            && (creator_name.is_empty()
+                                || creator_name
+                                    .iter()
+                                    .all(|kw| doc.creator().name().value().contains(kw)))
+                            && (description.is_empty()
+                                || description.iter().all(|kw| {
+                                    doc.description().map_or(false, |d| d.value().contains(kw))
+                                }))
+                            && (project_id.is_none()
+                                || project_id == Some(doc.project().map_or(0, |p| p.id().value())))
+                            && (project_name.is_empty()
+                                || project_name.iter().all(|kw| {
+                                    doc.project()
+                                        .map_or(false, |p| p.name().value().contains(kw))
+                                }))
+                    })
+                    .collect();
 
                 // term_day に設定した日数の前後 term_day で絞り込む
                 let date_filtered_docs: Vec<DocRes>;
                 if term_day.is_some() {
                     let term_duration = chrono::Duration::days(term_day.unwrap() as i64);
-                    date_filtered_docs = filtered_docs.into_iter().filter(|doc| {
-                        (created_at.is_none() || created_at.map_or(false, |ca| ca - term_duration <= *doc.created_at() && *doc.created_at() <= ca + term_duration)) &&
-                        (updated_at.is_none() || updated_at.map_or(false, |ua| ua - term_duration <= *doc.updated_at() && *doc.updated_at() <= ua + term_duration)) &&
-                        (start_at.is_none() || start_at.map_or(false, |sa| sa - term_duration <= doc.start_at().copied().unwrap_or_default() && doc.start_at().copied().unwrap_or_default() <= sa + term_duration)) &&
-                        (end_at.is_none() || end_at.map_or(false, |ea| ea - term_duration <= doc.end_at().copied().unwrap() && doc.end_at().copied().unwrap() <= ea + term_duration))
-                    }).collect();
+                    date_filtered_docs = filtered_docs
+                        .into_iter()
+                        .filter(|doc| {
+                            (created_at.is_none()
+                                || created_at.map_or(false, |ca| {
+                                    ca - term_duration <= *doc.created_at()
+                                        && *doc.created_at() <= ca + term_duration
+                                }))
+                                && (updated_at.is_none()
+                                    || updated_at.map_or(false, |ua| {
+                                        ua - term_duration <= *doc.updated_at()
+                                            && *doc.updated_at() <= ua + term_duration
+                                    }))
+                                && (start_at.is_none()
+                                    || start_at.map_or(false, |sa| {
+                                        sa - term_duration
+                                            <= doc.start_at().copied().unwrap_or_default()
+                                            && doc.start_at().copied().unwrap_or_default()
+                                                <= sa + term_duration
+                                    }))
+                                && (end_at.is_none()
+                                    || end_at.map_or(false, |ea| {
+                                        ea - term_duration <= doc.end_at().copied().unwrap()
+                                            && doc.end_at().copied().unwrap() <= ea + term_duration
+                                    }))
+                        })
+                        .collect();
                 } else {
-                    date_filtered_docs = filtered_docs.into_iter().filter(|doc| {
-                        (created_at.is_none() || created_at.map_or(false, |ca| *doc.created_at() == ca)) &&
-                        (updated_at.is_none() || updated_at.map_or(false, |ua| *doc.updated_at() == ua)) &&
-                        (start_at.is_none() || start_at.map_or(false, |sa| doc.start_at().map_or(false, |dsa| *dsa == sa))) &&
-                        (end_at.is_none() || end_at.map_or(false, |ea| doc.end_at().map_or(false, |dea| *dea == ea)))
-                    }).collect();
+                    date_filtered_docs = filtered_docs
+                        .into_iter()
+                        .filter(|doc| {
+                            (created_at.is_none()
+                                || created_at.map_or(false, |ca| *doc.created_at() == ca))
+                                && (updated_at.is_none()
+                                    || updated_at.map_or(false, |ua| *doc.updated_at() == ua))
+                                && (start_at.is_none()
+                                    || start_at.map_or(false, |sa| {
+                                        doc.start_at().map_or(false, |dsa| *dsa == sa)
+                                    }))
+                                && (end_at.is_none()
+                                    || end_at.map_or(false, |ea| {
+                                        doc.end_at().map_or(false, |dea| *dea == ea)
+                                    }))
+                        })
+                        .collect();
                 }
 
                 if date_filtered_docs.is_empty() {
@@ -270,7 +328,6 @@ impl Executable for RaskCommand {
                     return Ok(());
                 }
 
-                
                 if !is_visual {
                     // 1. フィルタリングされたドキュメントをコレクション（Vec）としてまとめる
                     let collected_docs: Vec<_> = date_filtered_docs.into_iter().collect();
@@ -281,14 +338,28 @@ impl Executable for RaskCommand {
                     // 3. 出力
                     println!("{}", json_array);
                 } else {
-                    println!("Found {} documents matching the criteria:", date_filtered_docs.len());
+                    println!(
+                        "Found {} documents matching the criteria:",
+                        date_filtered_docs.len()
+                    );
                     // ターミナルで見やすい形式で表示
                     for doc in date_filtered_docs {
                         println!("ID: {}", doc.id().value());
                         println!("Content: {}", doc.content().value());
-                        println!("Creator: {} (ID: {})", doc.creator().name().value(), doc.creator().id().value());
-                        println!("Start At: {}", doc.start_at().map_or("None".to_string(), |sa| sa.to_string()));
-                        println!("End At: {}", doc.end_at().map_or("None".to_string(), |ea| ea.to_string()));                        
+                        println!(
+                            "Creator: {} (ID: {})",
+                            doc.creator().name().value(),
+                            doc.creator().id().value()
+                        );
+                        println!(
+                            "Start At: {}",
+                            doc.start_at()
+                                .map_or("None".to_string(), |sa| sa.to_string())
+                        );
+                        println!(
+                            "End At: {}",
+                            doc.end_at().map_or("None".to_string(), |ea| ea.to_string())
+                        );
                     }
                 }
 

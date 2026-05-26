@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use clap::Parser;
 
 mod date;
@@ -11,15 +11,18 @@ mod task;
 
 use rask_command::*;
 
-#[derive(Parser)]
+#[derive(Parser, Debug)]
 struct Cli {
     #[command(subcommand)]
     command: RaskCommand,
 }
 
 fn main() -> Result<()> {
-    dotenv::dotenv()?;
+    dotenv::dotenv().context("envファイルの読み込みに失敗しました")?;
     let cli = Cli::parse();
-    cli.command.execute()?;
+    let command_name = format!("{:?}", cli.command);
+    cli.command
+        .execute()
+        .with_context(|| format!("コマンド'{:?}'の実行に失敗しました", command_name))?;
     Ok(())
 }
