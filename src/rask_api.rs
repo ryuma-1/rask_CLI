@@ -1,15 +1,17 @@
-use reqwest::blocking::{Client, Response}; // Responseを明示的にインポート
+use reqwest::blocking::{Client, Response};
+
+const PATH_TASKS: &str = "/tasks.json";
+const PATH_DOCS: &str = "/documents.json";
 
 pub trait RaskApi {
-    fn get_all_tasks(&self) -> anyhow::Result<(Response)>;
-    fn get_task(&self, path: i32) -> anyhow::Result<(Response)>;
-    fn create_task(&self, data: serde_json::Value) -> anyhow::Result<(Response)>;
-    fn get_all_docs(&self) -> anyhow::Result<(Response)>;
-    fn get_doc(&self, path: i32) -> anyhow::Result<(Response)>;
-    fn create_doc(&self, data: serde_json::Value) -> anyhow::Result<(Response)>;
+    fn get_all_tasks(&self) -> anyhow::Result<Response>;
+    fn get_task(&self, id: i32) -> anyhow::Result<Response>;
+    fn create_task(&self, data: serde_json::Value) -> anyhow::Result<Response>;
+    fn get_all_docs(&self) -> anyhow::Result<Response>;
+    fn get_doc(&self, id: i32) -> anyhow::Result<Response>;
+    fn create_doc(&self, data: serde_json::Value) -> anyhow::Result<Response>;
 }
 
-// 命名規則を PascalCase に変更
 pub struct RaskApiClient {
     client: Client,
     token: String,
@@ -17,7 +19,6 @@ pub struct RaskApiClient {
 }
 
 impl RaskApiClient {
-    // ニューインスタンス生成用の関数があると便利です
     pub fn new(token: String, url: String) -> Self {
         Self {
             client: Client::new(),
@@ -25,61 +26,48 @@ impl RaskApiClient {
             url,
         }
     }
+
+    fn build_url(&self, path: &str) -> String {
+        format!("{}{}?api_token={}", self.url, path, self.token)
+    }
 }
 
 impl RaskApi for RaskApiClient {
-    fn get_all_tasks(&self) -> anyhow::Result<(Response)> {
-        let res: Response = self
-            .client
-            .get(&format!("{}/tasks.json?api_token={}", self.url, self.token))
-            .send()?;
-
-        Ok(res)
+    fn get_all_tasks(&self) -> anyhow::Result<Response> {
+        Ok(self.client.get(self.build_url(PATH_TASKS)).send()?)
     }
 
-    fn get_task(&self, path: i32) -> anyhow::Result<(Response)> {
-        let res = self
+    fn get_task(&self, id: i32) -> anyhow::Result<Response> {
+        Ok(self
             .client
-            .get(&format!("{}/tasks/{}.json?api_token={}", self.url, path, self.token))
-            .send()?;
-
-        Ok(res)
+            .get(self.build_url(&format!("/tasks/{}.json", id)))
+            .send()?)
     }
 
-    fn create_task(&self, data: serde_json::Value) -> anyhow::Result<(Response)> {
-
-        let res = self.client
-            .post(&format!("{}/tasks.json?api_token={}", self.url, self.token))
+    fn create_task(&self, data: serde_json::Value) -> anyhow::Result<Response> {
+        Ok(self
+            .client
+            .post(self.build_url(PATH_TASKS))
             .json(&data)
-            .send()?;
-
-        Ok(res)
+            .send()?)
     }
 
-    fn get_all_docs(&self) -> anyhow::Result<(Response)> {
-        let res = self
+    fn get_all_docs(&self) -> anyhow::Result<Response> {
+        Ok(self.client.get(self.build_url(PATH_DOCS)).send()?)
+    }
+
+    fn get_doc(&self, id: i32) -> anyhow::Result<Response> {
+        Ok(self
             .client
-            .get(&format!("{}/documents.json?api_token={}", self.url, self.token))
-            .send()?;
-
-        Ok(res)
+            .get(self.build_url(&format!("/documents/{}.json", id)))
+            .send()?)
     }
 
-    fn get_doc(&self, path: i32) -> anyhow::Result<(Response)> {
-        let res = self
+    fn create_doc(&self, data: serde_json::Value) -> anyhow::Result<Response> {
+        Ok(self
             .client
-            .get(&format!("{}/documents/{}.json?api_token={}", self.url, path, self.token))
-            .send()?;
-
-        Ok(res)
-    }
-
-    fn create_doc(&self, json: serde_json::Value) -> anyhow::Result<(Response)> {
-        let res = self.client
-            .post(&format!("{}/documents.json?api_token={}", self.url, self.token))
-            .json(&json)
-            .send()?;
-
-        Ok(res)
+            .post(self.build_url(PATH_DOCS))
+            .json(&data)
+            .send()?)
     }
 }
