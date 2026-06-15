@@ -39,14 +39,6 @@ pub enum DocType {
     Other,
 }
 
-pub trait FromString: Sized {
-    // 1. エラー型を指定し、Sized制約（またはSelf: Sized）が必要
-    fn new(s: &String) -> Result<Self, String>;
-
-    // 2. インスタンスメソッドにするために &self を追加
-    fn to_string(&self) -> String;
-}
-
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(transparent)]
 pub struct Content {
@@ -315,18 +307,6 @@ impl Description {
     }
 }
 
-impl FromString for Description {
-    fn new(s: &String) -> Result<Self, String> {
-        Ok(Self {
-            description: s.clone(),
-        })
-    }
-
-    fn to_string(&self) -> String {
-        self.description.clone()
-    }
-}
-
 impl Tag {
     pub fn new(id: TagId, name: TagName) -> Self {
         Self { id, name }
@@ -398,18 +378,6 @@ impl TagName {
 
 impl Location {
     pub fn value(&self) -> String {
-        self.location.clone()
-    }
-}
-
-impl FromString for Location {
-    fn new(s: &String) -> Result<Self, String> {
-        Ok(Self {
-            location: s.clone(),
-        })
-    }
-
-    fn to_string(&self) -> String {
         self.location.clone()
     }
 }

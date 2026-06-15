@@ -2,7 +2,6 @@ use anyhow::{Context, Result};
 use clap::Parser;
 use std::env;
 
-mod date;
 mod doc;
 mod input_service;
 mod rask_api;

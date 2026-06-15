@@ -3,14 +3,14 @@ use reqwest::blocking::{Client, Response};
 use anyhow::{Context, Result};
 
 pub trait RaskApi {
-    fn get_all_tasks(&self) -> Result<(Response)>;
-    fn get_task(&self, path: i32) -> Result<(Response)>;
+    fn get_all_tasks(&self) -> Result<Response>;
+    fn get_task(&self, path: i32) -> Result<Response>;
     #[allow(dead_code)]
-    fn create_task(&self, data: serde_json::Value) -> Result<(Response)>;
-    fn get_all_docs(&self) -> Result<(Response)>;
-    fn get_doc(&self, path: i32) -> Result<(Response)>;
+    fn create_task(&self, data: serde_json::Value) -> Result<Response>;
+    fn get_all_docs(&self) -> Result<Response>;
+    fn get_doc(&self, path: i32) -> Result<Response>;
     #[allow(dead_code)]
-    fn create_doc(&self, data: serde_json::Value) -> Result<(Response)>;
+    fn create_doc(&self, data: serde_json::Value) -> Result<Response>;
 }
 
 pub struct RaskApiClient {
@@ -30,7 +30,7 @@ impl RaskApiClient {
 }
 
 impl RaskApi for RaskApiClient {
-    fn get_all_tasks(&self) -> Result<(Response)> {
+    fn get_all_tasks(&self) -> Result<Response> {
         let res: Response = self
             .client
             .get(&format!("{}/tasks.json?api_token={}", self.url, self.token))
@@ -40,7 +40,7 @@ impl RaskApi for RaskApiClient {
         Ok(res)
     }
 
-    fn get_task(&self, path: i32) -> Result<(Response)> {
+    fn get_task(&self, path: i32) -> Result<Response> {
         let res = self
             .client
             .get(&format!(
@@ -53,7 +53,7 @@ impl RaskApi for RaskApiClient {
         Ok(res)
     }
 
-    fn create_task(&self, data: serde_json::Value) -> Result<(Response)> {
+    fn create_task(&self, data: serde_json::Value) -> Result<Response> {
         let res = self
             .client
             .post(&format!("{}/tasks.json?api_token={}", self.url, self.token))
@@ -64,7 +64,7 @@ impl RaskApi for RaskApiClient {
         Ok(res)
     }
 
-    fn get_all_docs(&self) -> Result<(Response)> {
+    fn get_all_docs(&self) -> Result<Response> {
         let res = self
             .client
             .get(&format!(
@@ -77,7 +77,7 @@ impl RaskApi for RaskApiClient {
         Ok(res)
     }
 
-    fn get_doc(&self, path: i32) -> Result<(Response)> {
+    fn get_doc(&self, path: i32) -> Result<Response> {
         let res = self
             .client
             .get(&format!(
@@ -90,7 +90,7 @@ impl RaskApi for RaskApiClient {
         Ok(res)
     }
 
-    fn create_doc(&self, json: serde_json::Value) -> Result<(Response)> {
+    fn create_doc(&self, json: serde_json::Value) -> Result<Response> {
         let res = self
             .client
             .post(&format!(
