@@ -1,6 +1,7 @@
+#![allow(unused)]
 use std::io;
 
-use crate::task::FromString;
+use crate::doc::FromString;
 
 // 静的な名前空間として利用する構造体
 pub struct InputUtils;

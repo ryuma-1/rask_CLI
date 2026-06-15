@@ -6,9 +6,6 @@ use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 use strum::Display;
 
-use crate::date::Date;
-use crate::task::{Description, FromString, ProjectId};
-
 #[derive(Debug, Deserialize, Serialize)]
 pub struct DocRes {
     id: DocId,
@@ -30,8 +27,8 @@ pub struct DocReq {
     content: Content,
     description: Description,
     project_id: ProjectId,
-    start_at: StartAt,
-    end_at: EndAt,
+    start_at: DateTime<Utc>,
+    end_at: DateTime<Utc>,
     location: Location,
 }
 
@@ -41,10 +38,25 @@ pub enum DocType {
     GN,
     Other,
 }
+
+pub trait FromString: Sized {
+    // 1. エラー型を指定し、Sized制約（またはSelf: Sized）が必要
+    fn new(s: &String) -> Result<Self, String>;
+
+    // 2. インスタンスメソッドにするために &self を追加
+    fn to_string(&self) -> String;
+}
+
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(transparent)]
 pub struct Content {
     content: String,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+#[serde(transparent)]
+pub struct Description {
+    description: String,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -55,7 +67,7 @@ pub struct Creator {
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Project {
-    id: ProjectDocId,
+    id: ProjectId,
     name: ProjectName,
 }
 
@@ -91,7 +103,7 @@ pub struct CreatorName {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(transparent)]
-pub struct ProjectDocId {
+pub struct ProjectId {
     id: u32,
 }
 
@@ -115,18 +127,6 @@ pub struct TagName {
 
 #[derive(Deserialize, Serialize, Debug)]
 #[serde(transparent)]
-pub struct StartAt {
-    start_at: Date,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-#[serde(transparent)]
-pub struct EndAt {
-    end_at: Date,
-}
-
-#[derive(Deserialize, Serialize, Debug)]
-#[serde(transparent)]
 pub struct Location {
     location: String,
 }
@@ -136,8 +136,8 @@ impl DocReq {
         content: Content,
         description: Description,
         project_id: ProjectId,
-        start_at: StartAt,
-        end_at: EndAt,
+        start_at: DateTime<Utc>,
+        end_at: DateTime<Utc>,
         location: Location,
     ) -> Self {
         Self {
@@ -162,11 +162,11 @@ impl DocReq {
         &self.project_id
     }
 
-    pub fn start_at(&self) -> &StartAt {
+    pub fn start_at(&self) -> &DateTime<Utc> {
         &self.start_at
     }
 
-    pub fn end_at(&self) -> &EndAt {
+    pub fn end_at(&self) -> &DateTime<Utc> {
         &self.end_at
     }
 
@@ -296,16 +296,34 @@ impl Creator {
 }
 
 impl Project {
-    pub fn new(id: ProjectDocId, name: ProjectName) -> Self {
+    pub fn new(id: ProjectId, name: ProjectName) -> Self {
         Self { id, name }
     }
 
-    pub fn id(&self) -> &ProjectDocId {
+    pub fn id(&self) -> &ProjectId {
         &self.id
     }
 
     pub fn name(&self) -> &ProjectName {
         &self.name
+    }
+}
+
+impl Description {
+    pub fn value(&self) -> String {
+        self.description.clone()
+    }
+}
+
+impl FromString for Description {
+    fn new(s: &String) -> Result<Self, String> {
+        Ok(Self {
+            description: s.clone(),
+        })
+    }
+
+    fn to_string(&self) -> String {
+        self.description.clone()
     }
 }
 
@@ -354,7 +372,7 @@ impl CreatorName {
     }
 }
 
-impl ProjectDocId {
+impl ProjectId {
     pub fn value(&self) -> u32 {
         self.id
     }
@@ -375,62 +393,6 @@ impl TagId {
 impl TagName {
     pub fn value(&self) -> &str {
         &self.name
-    }
-}
-
-fn parse_date(s: &String, field_name: &str) -> Result<Date, String> {
-    let parts: Vec<&str> = s.split('-').collect();
-    if parts.len() != 3 {
-        return Err(format!(
-            "{} は YYYY-MM-DD 形式で入力してください。",
-            field_name
-        ));
-    }
-
-    let year: u16 = parts[0]
-        .parse()
-        .map_err(|_| "年は数値で入力してください。".to_string())?;
-    let month: u8 = parts[1]
-        .parse()
-        .map_err(|_| "月は数値で入力してください。".to_string())?;
-    let day: u8 = parts[2]
-        .parse()
-        .map_err(|_| "日は数値で入力してください。".to_string())?;
-
-    Date::new(year, month, day).map_err(|e| e.to_string())
-}
-
-impl StartAt {
-    pub fn value(&self) -> Date {
-        self.start_at.clone()
-    }
-}
-
-impl FromString for StartAt {
-    fn new(s: &String) -> Result<Self, String> {
-        let start_at = parse_date(s, "start_at")?;
-        Ok(Self { start_at })
-    }
-
-    fn to_string(&self) -> String {
-        self.start_at.to_string()
-    }
-}
-
-impl EndAt {
-    pub fn value(&self) -> Date {
-        self.end_at.clone()
-    }
-}
-
-impl FromString for EndAt {
-    fn new(s: &String) -> Result<Self, String> {
-        let end_at = parse_date(s, "end_at")?;
-        Ok(Self { end_at })
-    }
-
-    fn to_string(&self) -> String {
-        self.end_at.to_string()
     }
 }
 

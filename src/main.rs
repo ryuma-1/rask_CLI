@@ -5,10 +5,8 @@ use std::env;
 mod date;
 mod doc;
 mod input_service;
-mod minute;
 mod rask_api;
 mod rask_command;
-mod task;
 
 use rask_command::*;
 
@@ -36,5 +34,6 @@ fn main() -> Result<()> {
     cli.command
         .execute(api_client)
         .with_context(|| format!("コマンド'{:?}'の実行に失敗しました", command_name))?;
+
     Ok(())
 }
