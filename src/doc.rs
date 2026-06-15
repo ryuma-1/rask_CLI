@@ -206,7 +206,7 @@ impl DocRes {
         } else if content_str.contains("New") {
             DocType::New
         } else {
-            // デフォルトはNewとする
+            // デフォルトは Other とする
             DocType::Other
         }
     }
@@ -240,16 +240,12 @@ impl DocRes {
     }
 
     pub fn start_at(&self) -> Option<&DateTime<Utc>> {
-        match self.start_at {
-            Some(ref start_at) => Some(start_at),
-            None => None,
-        }
+        self.start_at.as_ref()
     }
 
     pub fn end_at(&self) -> Option<&DateTime<Utc>> {
         self.end_at.as_ref()
     }
-
     pub fn location(&self) -> Option<&Location> {
         self.location.as_ref()
     }
@@ -268,8 +264,8 @@ impl Content {
         keywords.iter().all(|kw| self.content.contains(kw))
     }
 
-    pub fn value(&self) -> String {
-        self.content.clone()
+    pub fn value(&self) -> &str {
+        &self.content
     }
 }
 
@@ -302,8 +298,8 @@ impl Project {
 }
 
 impl Description {
-    pub fn value(&self) -> String {
-        self.description.clone()
+    pub fn value(&self) -> &str {
+        &self.description
     }
 }
 
@@ -332,11 +328,11 @@ impl DocUrl {
         &self.url
     }
 
-    pub fn trim_json(&self) -> String {
+    pub fn trim_json(&self) -> Result<String> {
         self.url
             .strip_suffix(".json")
-            .unwrap_or(&self.url)
-            .to_string()
+            .map(|s| s.to_string())
+            .context(".json で終わっていない URL です")
     }
 }
 
@@ -377,7 +373,7 @@ impl TagName {
 }
 
 impl Location {
-    pub fn value(&self) -> String {
-        self.location.clone()
+    pub fn value(&self) -> &str {
+        &self.location
     }
 }
