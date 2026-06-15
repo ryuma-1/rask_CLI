@@ -1,7 +1,7 @@
 use crate::doc::*;
 use crate::rask_api::*;
 
-use anyhow::{Context, Ok, Result};
+use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use clap::Subcommand;
 
@@ -104,166 +104,45 @@ impl Executable for RaskCommand {
                 term_day,
                 is_visual,
             } => {
-                // 1. まずはすべてのドキュメントを取得
+                // 1. すべてのドキュメントを取得し DocResList に変換
                 let res = rask_api.get_all_docs()?;
-
-                // 2. レスポンスを Vec<DocRes> に変換
                 let doc_res: Vec<DocRes> = serde_json::from_str(&res.text()?)?;
+                let doc_list = DocResList::new(doc_res);
 
-                let result_res: Vec<DocRes>;
-
-                if id.is_none() {
-                    // 3. id が指定されている場合は，id で絞り込み
-                    let id_filtered_docs: Vec<DocRes> = doc_res
-                        .into_iter()
-                        .filter(|doc| id.is_none() || id == Some(doc.id().value()))
-                        .collect();
-                    result_res = id_filtered_docs;
+                // 2. 各粒度のフィルタを順に適用
+                let result = if is_id_match(id) {
+                    doc_list.filter_by_id(id)
                 } else {
-                    // 各フィールドで絞り込み
-                    let filtered_docs: Vec<DocRes> = doc_res
-                        .into_iter()
-                        .filter(|doc| {
-                        // 1. 本文（コンテンツ）のAND検索
-                            (content.is_empty()
-                            || doc.content().is_match(&content))
+                    let after_text = doc_list
+                        .filter_by_content(&content)
+                        .filter_by_creator(creator_id, &creator_name)
+                        .filter_by_description(&description)
+                        .filter_by_project(project_id, &project_name);
 
-                        // 2. 作成者IDの一致（Option型同士の比較はシンプルにするのが一番！）
-                        && (creator_id.is_none()
-                            || creator_id == Some(doc.creator().id().value()))
-
-                        // 3. 作成者名のAND検索
-                        && (creator_name.is_empty()
-                            || creator_name.iter().all(|kw| doc.creator().name().value().contains(kw)))
-
-                        // 4. 概要（Description）のAND検索（Option型なのでmap_orで安全に守る）
-                        && (description.is_empty()
-                            || description.iter().all(|kw| {
-                                doc.description().is_some_and(|d| d.value().contains(kw))
-                            }))
-
-                        // 5. プロジェクトIDの一致（プロジェクトが無い場合は0を身代わりにするか、以下のようにmap判定）
-                        && (project_id.is_none()
-                            || doc.project().is_some_and(|p| project_id == Some(p.id().value())))
-
-                        // 6. プロジェクト名のAND検索（プロジェクトが無い場合はfalse）
-                        && (project_name.is_empty()
-                            || project_name.iter().all(|kw| {
-                                doc.project().is_some_and(|p| p.name().value().contains(kw))
-                            }))
-                        })
-                        .collect( );
-
-                    // 4. 日付フィールドでさらに絞り込み
-                    if let Some(term) = term_day {
-                        // term_day が指定されている場合：各日付フィールドを「±term_duration の範囲内」でフィルタリング
-                        let term_duration = chrono::Duration::days(term as i64);
-
-                        let date_filtered_docs = filtered_docs
-                            .into_iter()
-                            .filter(|doc| {
-                                // created_at が未指定、または doc の created_at が [ca - term, ca + term] の範囲内
-                                let within_created_at = created_at.is_none()
-                                    || created_at.is_some_and(|ca| {
-                                        let lower = ca - term_duration;
-                                        let upper = ca + term_duration;
-                                        lower <= *doc.created_at() && *doc.created_at() <= upper
-                                    });
-
-                                // updated_at が未指定、または doc の updated_at が [ua - term, ua + term] の範囲内
-                                let within_updated_at = updated_at.is_none()
-                                    || updated_at.is_some_and(|ua| {
-                                        let lower = ua - term_duration;
-                                        let upper = ua + term_duration;
-                                        lower <= *doc.updated_at() && *doc.updated_at() <= upper
-                                    });
-
-                                // start_at が未指定、または doc の start_at が [sa - term, sa + term] の範囲内
-                                // doc.start_at() が None の場合は Default値（epoch）で比較
-                                let within_start_at = start_at.is_none()
-                                    || start_at.is_some_and(|sa| {
-                                        let doc_start = doc.start_at().copied().unwrap_or_default();
-                                        let lower = sa - term_duration;
-                                        let upper = sa + term_duration;
-                                        lower <= doc_start && doc_start <= upper
-                                    });
-
-                                // end_at が未指定、または doc の end_at が [ea - term, ea + term] の範囲内
-                                // doc.end_at() が None の場合は unwrap() でパニックする点に注意
-                                let within_end_at = end_at.is_none()
-                                    || end_at.is_some_and(|ea| {
-                                        let doc_end = doc.end_at().copied().unwrap(); // ※ None の場合パニック
-                                        let lower = ea - term_duration;
-                                        let upper = ea + term_duration;
-                                        lower <= doc_end && doc_end <= upper
-                                    });
-
-                                within_created_at
-                                    && within_updated_at
-                                    && within_start_at
-                                    && within_end_at
-                            })
-                            .collect();
-
-                        result_res = date_filtered_docs;
-                    } else {
-                        // term_day が未指定の場合：各日付フィールドを「完全一致」でフィルタリング
-                        let date_filtered_docs = filtered_docs
-                            .into_iter()
-                            .filter(|doc| {
-                                // created_at が未指定、または doc の created_at と完全一致
-                                let match_created_at = created_at.is_none()
-                                    || created_at.is_some_and(|ca| *doc.created_at() == ca);
-
-                                // updated_at が未指定、または doc の updated_at と完全一致
-                                let match_updated_at = updated_at.is_none()
-                                    || updated_at.is_some_and(|ua| *doc.updated_at() == ua);
-
-                                // start_at が未指定、または doc の start_at が Some かつ完全一致
-                                let match_start_at = start_at.is_none()
-                                    || start_at.is_some_and(|sa| {
-                                        doc.start_at().is_some_and(|dsa| *dsa == sa)
-                                    });
-
-                                // end_at が未指定、または doc の end_at が Some かつ完全一致
-                                let match_end_at = end_at.is_none()
-                                    || end_at.is_some_and(|ea| {
-                                        doc.end_at().is_some_and(|dea| *dea == ea)
-                                    });
-
-                                match_created_at
-                                    && match_updated_at
-                                    && match_start_at
-                                    && match_end_at
-                            })
-                            .collect();
-
-                        result_res = date_filtered_docs;
+                    match term_day {
+                        Some(term) => after_text
+                            .filter_by_date_range(created_at, updated_at, start_at, end_at, term),
+                        None => after_text
+                            .filter_by_date_exact(created_at, updated_at, start_at, end_at),
                     }
-                }
+                };
 
-                // 4. 各フィールドで絞り込み
-                if result_res.is_empty() {
+                // 3. 結果が空の場合は早期リターン
+                if result.docs().is_empty() {
                     eprintln!("No documents found matching the criteria.");
                     return Ok(());
                 }
 
+                // 4. 出力
                 if !is_visual {
-                    // 1. フィルタリングされたドキュメントをコレクション（Vec）としてまとめる
-                    let collected_docs: Vec<_> = result_res.into_iter().collect();
-
-                    // 2. 配列全体をJSON文字列に変換する
-                    let json_array = serde_json::to_string(&collected_docs)?;
-
-                    // 3. 出力
+                    let json_array = serde_json::to_string(result.docs())?;
                     println!("{}", json_array);
                 } else {
                     println!(
                         "Found {} documents matching the criteria:",
-                        result_res.len()
+                        result.docs().len()
                     );
-                    // ターミナルで見やすい形式で表示
-                    for doc in result_res {
+                    for doc in result.docs() {
                         println!("ID: {}", doc.id().value());
                         println!("Content: {}", doc.content().value());
                         println!(
@@ -294,4 +173,8 @@ fn print_response(res: reqwest::blocking::Response) -> anyhow::Result<()> {
     let body = res.text()?;
     println!("{}", body);
     Ok(())
+}
+
+fn is_id_match(id: Option<u32>) -> bool {
+    id.is_none()
 }

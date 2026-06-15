@@ -6,7 +6,7 @@ use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 use strum::Display;
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct DocRes {
     id: DocId,
     content: Content,
@@ -32,6 +32,11 @@ pub struct DocReq {
     location: Location,
 }
 
+#[derive(Debug, Clone)]
+pub struct DocResList {
+    docs: Vec<DocRes>,
+}
+
 #[derive(Debug, Clone, ValueEnum, PartialEq, Display)]
 pub enum DocType {
     New,
@@ -39,31 +44,31 @@ pub enum DocType {
     Other,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(transparent)]
 pub struct Content {
     content: String,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(transparent)]
 pub struct Description {
     description: String,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Creator {
     id: CreatorId,
     name: CreatorName,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Project {
     id: ProjectId,
     name: ProjectName,
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Tag {
     id: TagId,
     name: TagName,
@@ -117,7 +122,7 @@ pub struct TagName {
     name: String,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
+#[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(transparent)]
 pub struct Location {
     location: String,
@@ -256,6 +261,237 @@ impl DocRes {
 
     pub fn url(&self) -> &DocUrl {
         &self.url
+    }
+}
+
+impl DocResList {
+    pub fn new(docs: Vec<DocRes>) -> Self {
+        Self { docs }
+    }
+
+    pub fn docs(&self) -> &Vec<DocRes> {
+        &self.docs
+    }
+
+    // -------------------------------------------------------
+    // 個別フィルタ
+    // -------------------------------------------------------
+
+    /// ID で絞り込む
+    pub fn filter_by_id(&self, id: Option<u32>) -> Self {
+        if id.is_none() {
+            return Self::new(self.docs.clone());
+        }
+        let filtered = self
+            .docs
+            .iter()
+            .filter(|doc| id == Some(doc.id().value()))
+            .cloned()
+            .collect();
+        Self::new(filtered)
+    }
+
+    /// 本文（コンテンツ）のAND検索
+    pub fn filter_by_content(&self, content: &[String]) -> Self {
+        if content.is_empty() {
+            return Self::new(self.docs.clone());
+        }
+        let filtered = self
+            .docs
+            .iter()
+            .filter(|doc| doc.content().is_match(content))
+            .cloned()
+            .collect();
+        Self::new(filtered)
+    }
+
+    /// 作成者ID・作成者名のAND検索
+    pub fn filter_by_creator(&self, creator_id: Option<u32>, creator_name: &[String]) -> Self {
+        let filtered = self
+            .docs
+            .iter()
+            .filter(|doc| {
+                let match_id =
+                    creator_id.is_none() || creator_id == Some(doc.creator().id().value());
+
+                let match_name = creator_name.is_empty()
+                    || creator_name
+                        .iter()
+                        .all(|kw| doc.creator().name().value().contains(kw));
+
+                match_id && match_name
+            })
+            .cloned()
+            .collect();
+        Self::new(filtered)
+    }
+
+    /// 概要（Description）のAND検索
+    pub fn filter_by_description(&self, description: &[String]) -> Self {
+        if description.is_empty() {
+            return Self::new(self.docs.clone());
+        }
+        let filtered = self
+            .docs
+            .iter()
+            .filter(|doc| {
+                description
+                    .iter()
+                    .all(|kw| doc.description().is_some_and(|d| d.value().contains(kw)))
+            })
+            .cloned()
+            .collect();
+        Self::new(filtered)
+    }
+
+    /// プロジェクトID・プロジェクト名のAND検索
+    pub fn filter_by_project(&self, project_id: Option<u32>, project_name: &[String]) -> Self {
+        let filtered = self
+            .docs
+            .iter()
+            .filter(|doc| {
+                let match_id = project_id.is_none()
+                    || doc
+                        .project()
+                        .is_some_and(|p| project_id == Some(p.id().value()));
+
+                let match_name = project_name.is_empty()
+                    || project_name
+                        .iter()
+                        .all(|kw| doc.project().is_some_and(|p| p.name().value().contains(kw)));
+
+                match_id && match_name
+            })
+            .cloned()
+            .collect();
+        Self::new(filtered)
+    }
+
+    /// 日付フィールドを ±term_duration の範囲内でフィルタリング
+    ///
+    /// ⚠️ `end_at` フィルタ指定時に `doc.end_at()` が `None` の場合パニックします
+    pub fn filter_by_date_range(
+        &self,
+        created_at: Option<chrono::DateTime<chrono::Utc>>,
+        updated_at: Option<chrono::DateTime<chrono::Utc>>,
+        start_at: Option<chrono::DateTime<chrono::Utc>>,
+        end_at: Option<chrono::DateTime<chrono::Utc>>,
+        term_day: u32,
+    ) -> Self {
+        let term_duration = chrono::Duration::days(term_day as i64);
+
+        let filtered = self
+            .docs
+            .iter()
+            .filter(|doc| {
+                let within_created_at = created_at.is_none()
+                    || created_at.is_some_and(|ca| {
+                        let lower = ca - term_duration;
+                        let upper = ca + term_duration;
+                        lower <= *doc.created_at() && *doc.created_at() <= upper
+                    });
+
+                let within_updated_at = updated_at.is_none()
+                    || updated_at.is_some_and(|ua| {
+                        let lower = ua - term_duration;
+                        let upper = ua + term_duration;
+                        lower <= *doc.updated_at() && *doc.updated_at() <= upper
+                    });
+
+                let within_start_at = start_at.is_none()
+                    || start_at.is_some_and(|sa| {
+                        let doc_start = doc.start_at().copied().unwrap_or_default();
+                        let lower = sa - term_duration;
+                        let upper = sa + term_duration;
+                        lower <= doc_start && doc_start <= upper
+                    });
+
+                // ⚠️ doc.end_at() が None の場合パニック
+                let within_end_at = end_at.is_none()
+                    || end_at.is_some_and(|ea| {
+                        let doc_end = doc.end_at().copied().unwrap();
+                        let lower = ea - term_duration;
+                        let upper = ea + term_duration;
+                        lower <= doc_end && doc_end <= upper
+                    });
+
+                within_created_at && within_updated_at && within_start_at && within_end_at
+            })
+            .cloned()
+            .collect();
+        Self::new(filtered)
+    }
+
+    /// 日付フィールドを完全一致でフィルタリング
+    pub fn filter_by_date_exact(
+        &self,
+        created_at: Option<chrono::DateTime<chrono::Utc>>,
+        updated_at: Option<chrono::DateTime<chrono::Utc>>,
+        start_at: Option<chrono::DateTime<chrono::Utc>>,
+        end_at: Option<chrono::DateTime<chrono::Utc>>,
+    ) -> Self {
+        let filtered = self
+            .docs
+            .iter()
+            .filter(|doc| {
+                let match_created_at =
+                    created_at.is_none() || created_at.is_some_and(|ca| *doc.created_at() == ca);
+
+                let match_updated_at =
+                    updated_at.is_none() || updated_at.is_some_and(|ua| *doc.updated_at() == ua);
+
+                let match_start_at = start_at.is_none()
+                    || start_at.is_some_and(|sa| doc.start_at().is_some_and(|dsa| *dsa == sa));
+
+                let match_end_at = end_at.is_none()
+                    || end_at.is_some_and(|ea| doc.end_at().is_some_and(|dea| *dea == ea));
+
+                match_created_at && match_updated_at && match_start_at && match_end_at
+            })
+            .cloned()
+            .collect();
+        Self::new(filtered)
+    }
+
+    // -------------------------------------------------------
+    // 全条件をまとめて適用するエントリポイント
+    // -------------------------------------------------------
+
+    /// 全フィルタを順に適用する
+    pub fn filter(
+        &self,
+        id: Option<u32>,
+        content: Vec<String>,
+        creator_id: Option<u32>,
+        creator_name: Vec<String>,
+        description: Vec<String>,
+        project_id: Option<u32>,
+        project_name: Vec<String>,
+        created_at: Option<chrono::DateTime<chrono::Utc>>,
+        updated_at: Option<chrono::DateTime<chrono::Utc>>,
+        start_at: Option<chrono::DateTime<chrono::Utc>>,
+        end_at: Option<chrono::DateTime<chrono::Utc>>,
+        term_day: Option<u32>,
+    ) -> Self {
+        // id が指定されている場合は id のみで絞り込み（他条件はスキップ）
+        if id.is_none() {
+            return self.filter_by_id(id);
+        }
+
+        // テキスト・関連フィールドで絞り込み（メソッドチェーン）
+        let result = self
+            .filter_by_content(&content)
+            .filter_by_creator(creator_id, &creator_name)
+            .filter_by_description(&description)
+            .filter_by_project(project_id, &project_name);
+
+        // 日付フィールドで絞り込み（term_day の有無で分岐）
+        match term_day {
+            Some(term) => {
+                result.filter_by_date_range(created_at, updated_at, start_at, end_at, term)
+            }
+            None => result.filter_by_date_exact(created_at, updated_at, start_at, end_at),
+        }
     }
 }
 
