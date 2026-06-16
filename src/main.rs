@@ -3,7 +3,7 @@ use clap::Parser;
 use std::env;
 
 mod doc;
-mod input_service;
+mod print_service;
 mod rask_api;
 mod rask_command;
 

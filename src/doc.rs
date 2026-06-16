@@ -1,4 +1,6 @@
-#![allow(dead_code)]
+#[allow(dead_code)]
+use crate::print_service;
+use crate::print_service::*;
 
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
@@ -273,25 +275,16 @@ impl DocResList {
         &self.docs
     }
 
-    // -------------------------------------------------------
-    // 個別フィルタ
-    // -------------------------------------------------------
-
-    /// ID で絞り込む
-    pub fn filter_by_id(&self, id: Option<u32>) -> Self {
-        if id.is_none() {
-            return Self::new(self.docs.clone());
-        }
+    pub fn filter_by_id(&self, id: u32) -> Self {
         let filtered = self
             .docs
             .iter()
-            .filter(|doc| id == Some(doc.id().value()))
+            .filter(|doc| id == doc.id().value())
             .cloned()
             .collect();
         Self::new(filtered)
     }
 
-    /// 本文（コンテンツ）のAND検索
     pub fn filter_by_content(&self, content: &[String]) -> Self {
         if content.is_empty() {
             return Self::new(self.docs.clone());
@@ -305,7 +298,6 @@ impl DocResList {
         Self::new(filtered)
     }
 
-    /// 作成者ID・作成者名のAND検索
     pub fn filter_by_creator(&self, creator_id: Option<u32>, creator_name: &[String]) -> Self {
         let filtered = self
             .docs
@@ -326,7 +318,6 @@ impl DocResList {
         Self::new(filtered)
     }
 
-    /// 概要（Description）のAND検索
     pub fn filter_by_description(&self, description: &[String]) -> Self {
         if description.is_empty() {
             return Self::new(self.docs.clone());
@@ -344,7 +335,6 @@ impl DocResList {
         Self::new(filtered)
     }
 
-    /// プロジェクトID・プロジェクト名のAND検索
     pub fn filter_by_project(&self, project_id: Option<u32>, project_name: &[String]) -> Self {
         let filtered = self
             .docs
@@ -367,8 +357,6 @@ impl DocResList {
         Self::new(filtered)
     }
 
-    /// 日付フィールドを ±term_duration の範囲内でフィルタリング
-    ///
     /// ⚠️ `end_at` フィルタ指定時に `doc.end_at()` が `None` の場合パニックします
     pub fn filter_by_date_range(
         &self,
@@ -422,7 +410,6 @@ impl DocResList {
         Self::new(filtered)
     }
 
-    /// 日付フィールドを完全一致でフィルタリング
     pub fn filter_by_date_exact(
         &self,
         created_at: Option<chrono::DateTime<chrono::Utc>>,
@@ -452,46 +439,81 @@ impl DocResList {
             .collect();
         Self::new(filtered)
     }
+}
 
-    // -------------------------------------------------------
-    // 全条件をまとめて適用するエントリポイント
-    // -------------------------------------------------------
+impl Printable for DocReq {
+    fn get_print_fields(&self) -> Vec<print_service::PrintField> {
+        vec![
+            print_service::PrintField::new("Content", self.content().value()),
+            print_service::PrintField::new("Description", self.description().value()),
+            print_service::PrintField::new("Project ID", &self.project_id().value().to_string()),
+            print_service::PrintField::new("Start At", &self.start_at().to_string()),
+            print_service::PrintField::new("End At", &self.end_at().to_string()),
+            print_service::PrintField::new("Location", self.location().value()),
+        ]
+    }
+}
 
-    /// 全フィルタを順に適用する
-    pub fn filter(
-        &self,
-        id: Option<u32>,
-        content: Vec<String>,
-        creator_id: Option<u32>,
-        creator_name: Vec<String>,
-        description: Vec<String>,
-        project_id: Option<u32>,
-        project_name: Vec<String>,
-        created_at: Option<chrono::DateTime<chrono::Utc>>,
-        updated_at: Option<chrono::DateTime<chrono::Utc>>,
-        start_at: Option<chrono::DateTime<chrono::Utc>>,
-        end_at: Option<chrono::DateTime<chrono::Utc>>,
-        term_day: Option<u32>,
-    ) -> Self {
-        // id が指定されている場合は id のみで絞り込み（他条件はスキップ）
-        if id.is_none() {
-            return self.filter_by_id(id);
-        }
+impl Printable for DocRes {
+    fn get_print_fields(&self) -> Vec<print_service::PrintField> {
+        vec![
+            print_service::PrintField::new("ID", &self.id().value().to_string()),
+            print_service::PrintField::new("Content", self.content().value()),
+            print_service::PrintField::new("Creator ID", &self.creator().id().value().to_string()),
+            print_service::PrintField::new("Creator Name", self.creator().name().value()),
+            print_service::PrintField::new(
+                "Description",
+                self.description()
+                    .map(|d| d.value())
+                    .unwrap_or_else(|| "None"),
+            ),
+            print_service::PrintField::new("Created At", &self.created_at().to_string()),
+            print_service::PrintField::new("Updated At", &self.updated_at().to_string()),
+            print_service::PrintField::new(
+                "Project",
+                self.project()
+                    .map(|p| p.name().value())
+                    .unwrap_or_else(|| "None"),
+            ),
+            print_service::PrintField::new(
+                "Start At",
+                self.start_at()
+                    .map(|d| d.to_string())
+                    .unwrap_or_else(|| "None".to_string()),
+            ),
+            print_service::PrintField::new(
+                "End At",
+                self.end_at()
+                    .map(|d| d.to_string())
+                    .unwrap_or_else(|| "None".to_string()),
+            ),
+            print_service::PrintField::new(
+                "Location",
+                self.location().map(|l| l.value()).unwrap_or_else(|| "None"),
+            ),
+            print_service::PrintField::new(
+                "Tags",
+                if self.tags().is_empty() {
+                    "None".to_string()
+                } else {
+                    self.tags()
+                        .iter()
+                        .map(|t| t.name().value())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                },
+            ),
+            print_service::PrintField::new("URL", self.url().value()),
+        ]
+    }
+}
 
-        // テキスト・関連フィールドで絞り込み（メソッドチェーン）
-        let result = self
-            .filter_by_content(&content)
-            .filter_by_creator(creator_id, &creator_name)
-            .filter_by_description(&description)
-            .filter_by_project(project_id, &project_name);
-
-        // 日付フィールドで絞り込み（term_day の有無で分岐）
-        match term_day {
-            Some(term) => {
-                result.filter_by_date_range(created_at, updated_at, start_at, end_at, term)
-            }
-            None => result.filter_by_date_exact(created_at, updated_at, start_at, end_at),
-        }
+impl PrintableList for DocResList {
+    fn get_printable_list(&self) -> Vec<Box<dyn Printable>> {
+        self.docs()
+            .iter()
+            .map(|doc| Box::new(doc.clone()) as Box<dyn Printable>)
+            .collect()
     }
 }
 
