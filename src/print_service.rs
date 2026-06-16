@@ -36,7 +36,6 @@ impl PrintService {
         Ok(())
     }
 
-    #[allow(dead_code)]
     pub fn print_json(&self, data: &dyn Printable) -> Result<()> {
         let map: std::collections::HashMap<String, String> = data
             .get_print_fields()

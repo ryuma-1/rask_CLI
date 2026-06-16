@@ -1,9 +1,8 @@
-#[allow(dead_code)]
 use crate::print_service;
 use crate::print_service::*;
-
-use anyhow::{Context, Result};
+use crate::rask::*;
 use chrono::{DateTime, Utc};
+
 use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 use strum::Display;
@@ -21,7 +20,7 @@ pub struct DocRes {
     end_at: Option<DateTime<Utc>>,
     location: Option<Location>,
     tags: Vec<Tag>,
-    url: DocUrl,
+    url: Url,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -58,24 +57,6 @@ pub struct Description {
     description: String,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct Creator {
-    id: CreatorId,
-    name: CreatorName,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct Project {
-    id: ProjectId,
-    name: ProjectName,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct Tag {
-    id: TagId,
-    name: TagName,
-}
-
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(transparent)]
 pub struct DocId {
@@ -84,52 +65,11 @@ pub struct DocId {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(transparent)]
-pub struct DocUrl {
-    url: String,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(transparent)]
-pub struct CreatorId {
-    id: u32,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(transparent)]
-pub struct CreatorName {
-    name: String,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(transparent)]
-pub struct ProjectId {
-    id: u32,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(transparent)]
-pub struct ProjectName {
-    name: String,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(transparent)]
-pub struct TagId {
-    id: u32,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(transparent)]
-pub struct TagName {
-    name: String,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(transparent)]
 pub struct Location {
     location: String,
 }
 
+#[allow(dead_code)]
 impl DocReq {
     pub fn new(
         content: Content,
@@ -175,6 +115,7 @@ impl DocReq {
 }
 
 impl DocRes {
+    #[allow(dead_code)]
     pub fn new(
         id: DocId,
         content: Content,
@@ -187,7 +128,7 @@ impl DocRes {
         end_at: Option<DateTime<Utc>>,
         location: Option<Location>,
         tags: Vec<Tag>,
-        url: DocUrl,
+        url: Url,
     ) -> Self {
         Self {
             id,
@@ -202,19 +143,6 @@ impl DocRes {
             location,
             tags,
             url,
-        }
-    }
-
-    pub fn to_type(&self) -> DocType {
-        // contentの文字列からGNまたはNewという文字列が存在するかを確認
-        let content_str = self.content().value();
-        if content_str.contains("GN") {
-            DocType::GN
-        } else if content_str.contains("New") {
-            DocType::New
-        } else {
-            // デフォルトは Other とする
-            DocType::Other
         }
     }
 
@@ -261,7 +189,7 @@ impl DocRes {
         &self.tags
     }
 
-    pub fn url(&self) -> &DocUrl {
+    pub fn url(&self) -> &Url {
         &self.url
     }
 }
@@ -292,7 +220,7 @@ impl DocResList {
         let filtered = self
             .docs
             .iter()
-            .filter(|doc| doc.content().is_match(content))
+            .filter(|doc| content.iter().all(|kw| doc.content().value().contains(kw)))
             .cloned()
             .collect();
         Self::new(filtered)
@@ -357,7 +285,6 @@ impl DocResList {
         Self::new(filtered)
     }
 
-    /// ⚠️ `end_at` フィルタ指定時に `doc.end_at()` が `None` の場合パニックします
     pub fn filter_by_date_range(
         &self,
         created_at: Option<chrono::DateTime<chrono::Utc>>,
@@ -388,19 +315,20 @@ impl DocResList {
 
                 let within_start_at = start_at.is_none()
                     || start_at.is_some_and(|sa| {
-                        let doc_start = doc.start_at().copied().unwrap_or_default();
-                        let lower = sa - term_duration;
-                        let upper = sa + term_duration;
-                        lower <= doc_start && doc_start <= upper
+                        doc.start_at().copied().is_some_and(|doc_start| {
+                            let lower = sa - term_duration;
+                            let upper = sa + term_duration;
+                            lower <= doc_start && doc_start <= upper
+                        })
                     });
 
-                // ⚠️ doc.end_at() が None の場合パニック
                 let within_end_at = end_at.is_none()
                     || end_at.is_some_and(|ea| {
-                        let doc_end = doc.end_at().copied().unwrap();
-                        let lower = ea - term_duration;
-                        let upper = ea + term_duration;
-                        lower <= doc_end && doc_end <= upper
+                        doc.end_at().copied().is_some_and(|doc_end| {
+                            let lower = ea - term_duration;
+                            let upper = ea + term_duration;
+                            lower <= doc_end && doc_end <= upper
+                        })
                     });
 
                 within_created_at && within_updated_at && within_start_at && within_end_at
@@ -518,40 +446,8 @@ impl PrintableList for DocResList {
 }
 
 impl Content {
-    pub fn is_match(&self, keywords: &[String]) -> bool {
-        keywords.iter().all(|kw| self.content.contains(kw))
-    }
-
     pub fn value(&self) -> &str {
         &self.content
-    }
-}
-
-impl Creator {
-    pub fn new(id: CreatorId, name: CreatorName) -> Self {
-        Self { id, name }
-    }
-
-    pub fn id(&self) -> &CreatorId {
-        &self.id
-    }
-
-    pub fn name(&self) -> &CreatorName {
-        &self.name
-    }
-}
-
-impl Project {
-    pub fn new(id: ProjectId, name: ProjectName) -> Self {
-        Self { id, name }
-    }
-
-    pub fn id(&self) -> &ProjectId {
-        &self.id
-    }
-
-    pub fn name(&self) -> &ProjectName {
-        &self.name
     }
 }
 
@@ -561,72 +457,9 @@ impl Description {
     }
 }
 
-impl Tag {
-    pub fn new(id: TagId, name: TagName) -> Self {
-        Self { id, name }
-    }
-
-    pub fn id(&self) -> &TagId {
-        &self.id
-    }
-
-    pub fn name(&self) -> &TagName {
-        &self.name
-    }
-}
-
 impl DocId {
     pub fn value(&self) -> u32 {
         self.id
-    }
-}
-
-impl DocUrl {
-    pub fn value(&self) -> &str {
-        &self.url
-    }
-
-    pub fn trim_json(&self) -> Result<String> {
-        self.url
-            .strip_suffix(".json")
-            .map(|s| s.to_string())
-            .context(".json で終わっていない URL です")
-    }
-}
-
-impl CreatorId {
-    pub fn value(&self) -> u32 {
-        self.id
-    }
-}
-
-impl CreatorName {
-    pub fn value(&self) -> &str {
-        &self.name
-    }
-}
-
-impl ProjectId {
-    pub fn value(&self) -> u32 {
-        self.id
-    }
-}
-
-impl ProjectName {
-    pub fn value(&self) -> &str {
-        &self.name
-    }
-}
-
-impl TagId {
-    pub fn value(&self) -> u32 {
-        self.id
-    }
-}
-
-impl TagName {
-    pub fn value(&self) -> &str {
-        &self.name
     }
 }
 

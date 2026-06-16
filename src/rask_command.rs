@@ -1,6 +1,7 @@
 use crate::doc::*;
 use crate::print_service;
 use crate::rask_api::*;
+use crate::task::*;
 
 use anyhow::Result;
 use chrono::{DateTime, Utc};
@@ -8,13 +9,25 @@ use clap::Subcommand;
 
 #[derive(Subcommand, Debug)]
 pub enum RaskCommand {
-    GetAllTasks {},
+    GetAllTasks {
+        #[arg(long, default_value_t = false)]
+        is_json: bool,
+    },
     GetTask {
         id: i32,
+
+        #[arg(long, default_value_t = false)]
+        is_json: bool,
     },
-    GetAllDocs {},
+    GetAllDocs {
+        #[arg(long, default_value_t = false)]
+        is_json: bool,
+    },
     GetDoc {
         id: i32,
+
+        #[arg(long, default_value_t = false)]
+        is_json: bool,
     },
     SearchDoc {
         #[arg(long)]
@@ -64,29 +77,70 @@ pub trait Executable {
 
 impl Executable for RaskCommand {
     fn execute(self, rask_api: RaskApiClient) -> Result<()> {
+        let print_service = print_service::PrintService::new();
+
         match self {
-            RaskCommand::GetAllTasks {} => {
+            RaskCommand::GetAllTasks { is_json } => {
                 let res = rask_api.get_all_tasks()?;
-                print_response(res)?;
+                let task_res: Vec<TaskRes> = serde_json::from_str(&res.text()?)?;
+                let task_list = TaskResList::new(task_res);
+
+                if task_list.tasks().is_empty() {
+                    eprintln!("No tasks found.");
+                    return Ok(());
+                }
+
+                if is_json {
+                    print_service.print_list_json(&task_list)?;
+                } else {
+                    print_service.print_list(&task_list)?;
+                }
+
                 Ok(())
             }
 
-            RaskCommand::GetTask { id } => {
+            RaskCommand::GetTask { id, is_json } => {
                 let res = rask_api.get_task(id)?;
-                print_response(res)?;
+                let task_res: TaskRes = serde_json::from_str(&res.text()?)?;
+
+                if is_json {
+                    print_service.print_json(&task_res)?;
+                } else {
+                    print_service.print(&task_res)?;
+                }
+
                 Ok(())
             }
 
-            RaskCommand::GetAllDocs {} => {
+            RaskCommand::GetAllDocs { is_json } => {
                 let res = rask_api.get_all_docs()?;
-                print_response(res)?;
-                // print_response(res)?;
+                let doc_res: Vec<DocRes> = serde_json::from_str(&res.text()?)?;
+                let doc_list = DocResList::new(doc_res);
+
+                if doc_list.docs().is_empty() {
+                    eprintln!("No documents found.");
+                    return Ok(());
+                }
+
+                if is_json {
+                    print_service.print_list_json(&doc_list)?;
+                } else {
+                    print_service.print_list(&doc_list)?;
+                }
+
                 Ok(())
             }
 
-            RaskCommand::GetDoc { id } => {
+            RaskCommand::GetDoc { id, is_json } => {
                 let res = rask_api.get_doc(id)?;
-                print_response(res)?;
+                let doc_res: DocRes = serde_json::from_str(&res.text()?)?;
+
+                if is_json {
+                    print_service.print_json(&doc_res)?;
+                } else {
+                    print_service.print(&doc_res)?;
+                }
+
                 Ok(())
             }
 
@@ -134,8 +188,6 @@ impl Executable for RaskCommand {
                 }
 
                 // 4. 出力
-                let print_service = print_service::PrintService::new();
-
                 if is_json {
                     print_service.print_list_json(&result)?;
                 } else {
@@ -146,13 +198,6 @@ impl Executable for RaskCommand {
             }
         }
     }
-}
-
-fn print_response(res: reqwest::blocking::Response) -> anyhow::Result<()> {
-    println!("Status: {}", res.status());
-    let body = res.text()?;
-    println!("{}", body);
-    Ok(())
 }
 
 fn filter_docs(
