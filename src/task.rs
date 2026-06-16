@@ -326,13 +326,13 @@ impl Assigner {
 impl Printable for TaskReq {
     fn get_print_fields(&self) -> Vec<print_service::PrintField> {
         vec![
-            print_service::PrintField::new("Assigner ID", &self.assigner_id().value().to_string()),
-            print_service::PrintField::new("Content", self.content().value()),
-            print_service::PrintField::new("Due At", &self.due_at().to_string()),
-            print_service::PrintField::new("Description", self.description().value()),
-            print_service::PrintField::new("Project ID", &self.project_id().value().to_string()),
+            print_service::PrintField::new("assigner_id", &self.assigner_id().value().to_string()),
+            print_service::PrintField::new("content", self.content().value()),
+            print_service::PrintField::new("due_at", &self.due_at().to_string()),
+            print_service::PrintField::new("description", self.description().value()),
+            print_service::PrintField::new("project_id", &self.project_id().value().to_string()),
             print_service::PrintField::new(
-                "Task State ID",
+                "task_state_id",
                 &self.task_state_id().value().to_string(),
             ),
         ]
@@ -342,32 +342,32 @@ impl Printable for TaskReq {
 impl Printable for TaskRes {
     fn get_print_fields(&self) -> Vec<print_service::PrintField> {
         vec![
-            print_service::PrintField::new("ID", &self.id().value().to_string()),
-            print_service::PrintField::new("Content", self.content().value()),
+            print_service::PrintField::new("id", &self.id().value().to_string()),
+            print_service::PrintField::new("content", self.content().value()),
             print_service::PrintField::new(
                 "Description",
                 self.description()
                     .map(|d| d.value())
                     .unwrap_or_else(|| "None"),
             ),
-            print_service::PrintField::new("Due At", &self.due_at().to_string()),
-            print_service::PrintField::new("Created At", &self.created_at().to_string()),
-            print_service::PrintField::new("Updated At", &self.updated_at().to_string()),
-            print_service::PrintField::new("Creator ID", &self.creator().id().value().to_string()),
-            print_service::PrintField::new("Creator Name", self.creator().name().value()),
+            print_service::PrintField::new("due_at", &self.due_at().to_string()),
+            print_service::PrintField::new("created_at", &self.created_at().to_string()),
+            print_service::PrintField::new("updated_at", &self.updated_at().to_string()),
+            print_service::PrintField::new("creator_id", &self.creator().id().value().to_string()),
+            print_service::PrintField::new("creator_name", self.creator().name().value()),
             print_service::PrintField::new(
-                "Assigner ID",
+                "assigner_id",
                 &self.assigner().id().value().to_string(),
             ),
-            print_service::PrintField::new("Assigner Name", self.assigner().name().value()),
+            print_service::PrintField::new("assigner_name", self.assigner().name().value()),
             print_service::PrintField::new(
-                "Project",
+                "project_id",
                 self.project()
                     .map(|p| p.name().value())
                     .unwrap_or_else(|| "None"),
             ),
             print_service::PrintField::new(
-                "Tags",
+                "tags",
                 if self.tags().is_empty() {
                     "None".to_string()
                 } else {
@@ -378,7 +378,7 @@ impl Printable for TaskRes {
                         .join(", ")
                 },
             ),
-            print_service::PrintField::new("URL", self.url().value()),
+            print_service::PrintField::new("url", self.url().value()),
         ]
     }
 }

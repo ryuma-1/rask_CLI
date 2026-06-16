@@ -372,12 +372,12 @@ impl DocResList {
 impl Printable for DocReq {
     fn get_print_fields(&self) -> Vec<print_service::PrintField> {
         vec![
-            print_service::PrintField::new("Content", self.content().value()),
-            print_service::PrintField::new("Description", self.description().value()),
-            print_service::PrintField::new("Project ID", &self.project_id().value().to_string()),
-            print_service::PrintField::new("Start At", &self.start_at().to_string()),
-            print_service::PrintField::new("End At", &self.end_at().to_string()),
-            print_service::PrintField::new("Location", self.location().value()),
+            print_service::PrintField::new("content", self.content().value()),
+            print_service::PrintField::new("description", self.description().value()),
+            print_service::PrintField::new("project_id", &self.project_id().value().to_string()),
+            print_service::PrintField::new("start_at", &self.start_at().to_string()),
+            print_service::PrintField::new("end_at", &self.end_at().to_string()),
+            print_service::PrintField::new("location", self.location().value()),
         ]
     }
 }
@@ -385,42 +385,42 @@ impl Printable for DocReq {
 impl Printable for DocRes {
     fn get_print_fields(&self) -> Vec<print_service::PrintField> {
         vec![
-            print_service::PrintField::new("ID", &self.id().value().to_string()),
-            print_service::PrintField::new("Content", self.content().value()),
-            print_service::PrintField::new("Creator ID", &self.creator().id().value().to_string()),
-            print_service::PrintField::new("Creator Name", self.creator().name().value()),
+            print_service::PrintField::new("id", &self.id().value().to_string()),
+            print_service::PrintField::new("content", self.content().value()),
+            print_service::PrintField::new("creator_id", &self.creator().id().value().to_string()),
+            print_service::PrintField::new("creator_name", self.creator().name().value()),
             print_service::PrintField::new(
-                "Description",
+                "description",
                 self.description()
                     .map(|d| d.value())
                     .unwrap_or_else(|| "None"),
             ),
-            print_service::PrintField::new("Created At", &self.created_at().to_string()),
-            print_service::PrintField::new("Updated At", &self.updated_at().to_string()),
+            print_service::PrintField::new("created_at", &self.created_at().to_string()),
+            print_service::PrintField::new("updated_at", &self.updated_at().to_string()),
             print_service::PrintField::new(
-                "Project",
+                "project_name",
                 self.project()
                     .map(|p| p.name().value())
                     .unwrap_or_else(|| "None"),
             ),
             print_service::PrintField::new(
-                "Start At",
+                "start_at",
                 self.start_at()
                     .map(|d| d.to_string())
                     .unwrap_or_else(|| "None".to_string()),
             ),
             print_service::PrintField::new(
-                "End At",
+                "end_at",
                 self.end_at()
                     .map(|d| d.to_string())
                     .unwrap_or_else(|| "None".to_string()),
             ),
             print_service::PrintField::new(
-                "Location",
+                "location",
                 self.location().map(|l| l.value()).unwrap_or_else(|| "None"),
             ),
             print_service::PrintField::new(
-                "Tags",
+                "tags",
                 if self.tags().is_empty() {
                     "None".to_string()
                 } else {
@@ -431,7 +431,7 @@ impl Printable for DocRes {
                         .join(", ")
                 },
             ),
-            print_service::PrintField::new("URL", self.url().value()),
+            print_service::PrintField::new("url", self.url().value()),
         ]
     }
 }
