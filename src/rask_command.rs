@@ -1,11 +1,17 @@
-use crate::doc::*;
-use crate::print_service;
-use crate::rask_api::*;
-use crate::task::*;
-
 use anyhow::Result;
 use chrono::{DateTime, Utc};
 use clap::Subcommand;
+
+use crate::{
+    doc::{DocRes, DocResList},
+    print_service,
+    rask_api::{RaskApi, RaskApiClient, RaskError},
+    task::{TaskRes, TaskResList},
+};
+
+pub trait Executable {
+    fn execute(self, rask_api: RaskApiClient) -> Result<()>;
+}
 
 #[derive(Subcommand, Debug)]
 pub enum RaskCommand {
@@ -71,8 +77,38 @@ pub enum RaskCommand {
     },
 }
 
-pub trait Executable {
-    fn execute(self, rask_api: RaskApiClient) -> Result<()>;
+fn filter_docs(
+    doc_list: DocResList,
+    id: Option<u32>,
+    content: Vec<String>,
+    creator_id: Option<u32>,
+    creator_name: Vec<String>,
+    description: Vec<String>,
+    created_at: Option<DateTime<Utc>>,
+    updated_at: Option<DateTime<Utc>>,
+    project_id: Option<u32>,
+    project_name: Vec<String>,
+    start_at: Option<DateTime<Utc>>,
+    end_at: Option<DateTime<Utc>>,
+    term_day: Option<u32>,
+) -> DocResList {
+    match id {
+        Some(id) => doc_list.filter_by_id(id),
+        None => {
+            let after_text = doc_list
+                .filter_by_content(&content)
+                .filter_by_creator(creator_id, &creator_name)
+                .filter_by_description(&description)
+                .filter_by_project(project_id, &project_name);
+
+            match term_day {
+                Some(term) => {
+                    after_text.filter_by_date_range(created_at, updated_at, start_at, end_at, term)
+                }
+                None => after_text.filter_by_date_exact(created_at, updated_at, start_at, end_at),
+            }
+        }
+    }
 }
 
 impl Executable for RaskCommand {
@@ -86,7 +122,7 @@ impl Executable for RaskCommand {
                 let task_list = TaskResList::new(task_res);
 
                 if task_list.tasks().is_empty() {
-                    eprintln!("No tasks found.");
+                    println!("タスクが見つかりませんでした");
                     return Ok(());
                 }
 
@@ -100,7 +136,15 @@ impl Executable for RaskCommand {
             }
 
             RaskCommand::GetTask { id, is_json } => {
-                let res = rask_api.get_task(id)?;
+                let res = match rask_api.get_task(id) {
+                    Ok(res) => res,
+                    Err(RaskError::TaskNotFound(_)) => {
+                        println!("指定した id のタスクが見つかりませんでした (id: {})", id);
+                        return Ok(());
+                    }
+                    Err(e) => return Err(e.into()),
+                };
+
                 let task_res: TaskRes = serde_json::from_str(&res.text()?)?;
 
                 if is_json {
@@ -118,7 +162,7 @@ impl Executable for RaskCommand {
                 let doc_list = DocResList::new(doc_res);
 
                 if doc_list.docs().is_empty() {
-                    eprintln!("No documents found.");
+                    println!("ドキュメントが見つかりませんでした");
                     return Ok(());
                 }
 
@@ -132,7 +176,18 @@ impl Executable for RaskCommand {
             }
 
             RaskCommand::GetDoc { id, is_json } => {
-                let res = rask_api.get_doc(id)?;
+                let res = match rask_api.get_doc(id) {
+                    Ok(res) => res,
+                    Err(RaskError::DocNotFound(_)) => {
+                        println!(
+                            "指定した id のドキュメントが見つかりませんでした (id: {})",
+                            id
+                        );
+                        return Ok(());
+                    }
+                    Err(e) => return Err(e.into()),
+                };
+
                 let doc_res: DocRes = serde_json::from_str(&res.text()?)?;
 
                 if is_json {
@@ -183,7 +238,7 @@ impl Executable for RaskCommand {
 
                 // 3. 結果が空の場合は終了
                 if result.docs().is_empty() {
-                    eprintln!("No documents found matching the criteria.");
+                    println!("条件に一致するドキュメントが見つかりませんでした");
                     return Ok(());
                 }
 
@@ -195,40 +250,6 @@ impl Executable for RaskCommand {
                 }
 
                 Ok(())
-            }
-        }
-    }
-}
-
-fn filter_docs(
-    doc_list: DocResList,
-    id: Option<u32>,
-    content: Vec<String>,
-    creator_id: Option<u32>,
-    creator_name: Vec<String>,
-    description: Vec<String>,
-    created_at: Option<DateTime<Utc>>,
-    updated_at: Option<DateTime<Utc>>,
-    project_id: Option<u32>,
-    project_name: Vec<String>,
-    start_at: Option<DateTime<Utc>>,
-    end_at: Option<DateTime<Utc>>,
-    term_day: Option<u32>,
-) -> DocResList {
-    match id {
-        Some(id) => doc_list.filter_by_id(id),
-        None => {
-            let after_text = doc_list
-                .filter_by_content(&content)
-                .filter_by_creator(creator_id, &creator_name)
-                .filter_by_description(&description)
-                .filter_by_project(project_id, &project_name);
-
-            match term_day {
-                Some(term) => {
-                    after_text.filter_by_date_range(created_at, updated_at, start_at, end_at, term)
-                }
-                None => after_text.filter_by_date_exact(created_at, updated_at, start_at, end_at),
             }
         }
     }

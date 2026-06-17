@@ -1,41 +1,59 @@
-use crate::print_service;
-use crate::print_service::*;
-use crate::rask::*;
 use chrono::{DateTime, Utc};
-
 use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
 use strum::Display;
 
+use crate::{
+    print_service::{self, Printable, PrintableList},
+    rask::{Creator, Project, ProjectId, Tag, Url},
+};
+
 #[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct DocRes {
-    id: DocId,
-    content: Content,
-    creator: Creator,
-    description: Option<Description>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
-    project: Option<Project>,
-    start_at: Option<DateTime<Utc>>,
-    end_at: Option<DateTime<Utc>>,
-    location: Option<Location>,
-    tags: Vec<Tag>,
-    url: Url,
+#[serde(transparent)]
+pub struct Content {
+    content: String,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
-pub struct DocReq {
-    content: Content,
-    description: Description,
-    project_id: ProjectId,
-    start_at: DateTime<Utc>,
-    end_at: DateTime<Utc>,
-    location: Location,
+impl Content {
+    pub fn value(&self) -> &str {
+        &self.content
+    }
 }
 
-#[derive(Debug, Clone)]
-pub struct DocResList {
-    docs: Vec<DocRes>,
+#[derive(Debug, Deserialize, Serialize, Clone)]
+#[serde(transparent)]
+pub struct Description {
+    description: String,
+}
+
+impl Description {
+    pub fn value(&self) -> &str {
+        &self.description
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+#[serde(transparent)]
+pub struct DocId {
+    id: u32,
+}
+
+impl DocId {
+    pub fn value(&self) -> u32 {
+        self.id
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+#[serde(transparent)]
+pub struct Location {
+    location: String,
+}
+
+impl Location {
+    pub fn value(&self) -> &str {
+        &self.location
+    }
 }
 
 #[derive(Debug, Clone, ValueEnum, PartialEq, Display)]
@@ -45,28 +63,14 @@ pub enum DocType {
     Other,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(transparent)]
-pub struct Content {
-    content: String,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(transparent)]
-pub struct Description {
-    description: String,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(transparent)]
-pub struct DocId {
-    id: u32,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(transparent)]
-pub struct Location {
-    location: String,
+#[derive(Debug, Deserialize, Serialize)]
+pub struct DocReq {
+    content: Content,
+    description: Description,
+    project_id: ProjectId,
+    start_at: DateTime<Utc>,
+    end_at: DateTime<Utc>,
+    location: Location,
 }
 
 #[allow(dead_code)]
@@ -112,6 +116,35 @@ impl DocReq {
     pub fn location(&self) -> &Location {
         &self.location
     }
+}
+
+impl Printable for DocReq {
+    fn get_print_fields(&self) -> Vec<print_service::PrintField> {
+        vec![
+            print_service::PrintField::new("content", self.content().value()),
+            print_service::PrintField::new("description", self.description().value()),
+            print_service::PrintField::new("project_id", &self.project_id().value().to_string()),
+            print_service::PrintField::new("start_at", &self.start_at().to_string()),
+            print_service::PrintField::new("end_at", &self.end_at().to_string()),
+            print_service::PrintField::new("location", self.location().value()),
+        ]
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct DocRes {
+    id: DocId,
+    content: Content,
+    creator: Creator,
+    description: Option<Description>,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+    project: Option<Project>,
+    start_at: Option<DateTime<Utc>>,
+    end_at: Option<DateTime<Utc>>,
+    location: Option<Location>,
+    tags: Vec<Tag>,
+    url: Url,
 }
 
 impl DocRes {
@@ -181,6 +214,7 @@ impl DocRes {
     pub fn end_at(&self) -> Option<&DateTime<Utc>> {
         self.end_at.as_ref()
     }
+
     pub fn location(&self) -> Option<&Location> {
         self.location.as_ref()
     }
@@ -192,6 +226,65 @@ impl DocRes {
     pub fn url(&self) -> &Url {
         &self.url
     }
+}
+
+impl Printable for DocRes {
+    fn get_print_fields(&self) -> Vec<print_service::PrintField> {
+        vec![
+            print_service::PrintField::new("id", &self.id().value().to_string()),
+            print_service::PrintField::new("content", self.content().value()),
+            print_service::PrintField::new("creator_id", &self.creator().id().value().to_string()),
+            print_service::PrintField::new("creator_name", self.creator().name().value()),
+            print_service::PrintField::new(
+                "description",
+                self.description()
+                    .map(|d| d.value())
+                    .unwrap_or_else(|| "None"),
+            ),
+            print_service::PrintField::new("created_at", &self.created_at().to_string()),
+            print_service::PrintField::new("updated_at", &self.updated_at().to_string()),
+            print_service::PrintField::new(
+                "project_name",
+                self.project()
+                    .map(|p| p.name().value())
+                    .unwrap_or_else(|| "None"),
+            ),
+            print_service::PrintField::new(
+                "start_at",
+                self.start_at()
+                    .map(|d| d.to_string())
+                    .unwrap_or_else(|| "None".to_string()),
+            ),
+            print_service::PrintField::new(
+                "end_at",
+                self.end_at()
+                    .map(|d| d.to_string())
+                    .unwrap_or_else(|| "None".to_string()),
+            ),
+            print_service::PrintField::new(
+                "location",
+                self.location().map(|l| l.value()).unwrap_or_else(|| "None"),
+            ),
+            print_service::PrintField::new(
+                "tags",
+                if self.tags().is_empty() {
+                    "None".to_string()
+                } else {
+                    self.tags()
+                        .iter()
+                        .map(|t| t.name().value())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                },
+            ),
+            print_service::PrintField::new("url", self.url().value()),
+        ]
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct DocResList {
+    docs: Vec<DocRes>,
 }
 
 impl DocResList {
@@ -287,10 +380,10 @@ impl DocResList {
 
     pub fn filter_by_date_range(
         &self,
-        created_at: Option<chrono::DateTime<chrono::Utc>>,
-        updated_at: Option<chrono::DateTime<chrono::Utc>>,
-        start_at: Option<chrono::DateTime<chrono::Utc>>,
-        end_at: Option<chrono::DateTime<chrono::Utc>>,
+        created_at: Option<DateTime<Utc>>,
+        updated_at: Option<DateTime<Utc>>,
+        start_at: Option<DateTime<Utc>>,
+        end_at: Option<DateTime<Utc>>,
         term_day: u32,
     ) -> Self {
         let term_duration = chrono::Duration::days(term_day as i64);
@@ -340,10 +433,10 @@ impl DocResList {
 
     pub fn filter_by_date_exact(
         &self,
-        created_at: Option<chrono::DateTime<chrono::Utc>>,
-        updated_at: Option<chrono::DateTime<chrono::Utc>>,
-        start_at: Option<chrono::DateTime<chrono::Utc>>,
-        end_at: Option<chrono::DateTime<chrono::Utc>>,
+        created_at: Option<DateTime<Utc>>,
+        updated_at: Option<DateTime<Utc>>,
+        start_at: Option<DateTime<Utc>>,
+        end_at: Option<DateTime<Utc>>,
     ) -> Self {
         let filtered = self
             .docs
@@ -369,102 +462,11 @@ impl DocResList {
     }
 }
 
-impl Printable for DocReq {
-    fn get_print_fields(&self) -> Vec<print_service::PrintField> {
-        vec![
-            print_service::PrintField::new("content", self.content().value()),
-            print_service::PrintField::new("description", self.description().value()),
-            print_service::PrintField::new("project_id", &self.project_id().value().to_string()),
-            print_service::PrintField::new("start_at", &self.start_at().to_string()),
-            print_service::PrintField::new("end_at", &self.end_at().to_string()),
-            print_service::PrintField::new("location", self.location().value()),
-        ]
-    }
-}
-
-impl Printable for DocRes {
-    fn get_print_fields(&self) -> Vec<print_service::PrintField> {
-        vec![
-            print_service::PrintField::new("id", &self.id().value().to_string()),
-            print_service::PrintField::new("content", self.content().value()),
-            print_service::PrintField::new("creator_id", &self.creator().id().value().to_string()),
-            print_service::PrintField::new("creator_name", self.creator().name().value()),
-            print_service::PrintField::new(
-                "description",
-                self.description()
-                    .map(|d| d.value())
-                    .unwrap_or_else(|| "None"),
-            ),
-            print_service::PrintField::new("created_at", &self.created_at().to_string()),
-            print_service::PrintField::new("updated_at", &self.updated_at().to_string()),
-            print_service::PrintField::new(
-                "project_name",
-                self.project()
-                    .map(|p| p.name().value())
-                    .unwrap_or_else(|| "None"),
-            ),
-            print_service::PrintField::new(
-                "start_at",
-                self.start_at()
-                    .map(|d| d.to_string())
-                    .unwrap_or_else(|| "None".to_string()),
-            ),
-            print_service::PrintField::new(
-                "end_at",
-                self.end_at()
-                    .map(|d| d.to_string())
-                    .unwrap_or_else(|| "None".to_string()),
-            ),
-            print_service::PrintField::new(
-                "location",
-                self.location().map(|l| l.value()).unwrap_or_else(|| "None"),
-            ),
-            print_service::PrintField::new(
-                "tags",
-                if self.tags().is_empty() {
-                    "None".to_string()
-                } else {
-                    self.tags()
-                        .iter()
-                        .map(|t| t.name().value())
-                        .collect::<Vec<_>>()
-                        .join(", ")
-                },
-            ),
-            print_service::PrintField::new("url", self.url().value()),
-        ]
-    }
-}
-
 impl PrintableList for DocResList {
     fn get_printable_list(&self) -> Vec<Box<dyn Printable>> {
         self.docs()
             .iter()
             .map(|doc| Box::new(doc.clone()) as Box<dyn Printable>)
             .collect()
-    }
-}
-
-impl Content {
-    pub fn value(&self) -> &str {
-        &self.content
-    }
-}
-
-impl Description {
-    pub fn value(&self) -> &str {
-        &self.description
-    }
-}
-
-impl DocId {
-    pub fn value(&self) -> u32 {
-        self.id
-    }
-}
-
-impl Location {
-    pub fn value(&self) -> &str {
-        &self.location
     }
 }

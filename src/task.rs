@@ -1,14 +1,127 @@
-use crate::print_service;
-use crate::print_service::*;
-use crate::rask::*;
-
-use anyhow::Result;
+use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-// ============================================================
-// Request structs
-// ============================================================
+use crate::{
+    print_service::{self, Printable, PrintableList},
+    rask::{Creator, Project, ProjectId, Tag, Url},
+};
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(transparent)]
+pub struct Content {
+    content: String,
+}
+
+impl Content {
+    pub fn value(&self) -> &str {
+        &self.content
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct Assigner {
+    id: AssignerId,
+    name: AssignerName,
+}
+
+impl Assigner {
+    #[allow(dead_code)]
+    pub fn new(id: AssignerId, name: AssignerName) -> Self {
+        Self { id, name }
+    }
+
+    pub fn id(&self) -> &AssignerId {
+        &self.id
+    }
+
+    pub fn name(&self) -> &AssignerName {
+        &self.name
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(transparent)]
+pub struct TaskId {
+    id: u32,
+}
+
+impl TaskId {
+    pub fn value(&self) -> u32 {
+        self.id
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(transparent)]
+pub struct AssignerId {
+    assigner_id: i32,
+}
+
+impl AssignerId {
+    #[allow(dead_code)]
+    pub fn new(s: &str) -> Result<Self> {
+        let assigner_id = s
+            .parse()
+            .with_context(|| format!("assigner_id は数値で入力してください: '{}'", s))?;
+        Ok(Self { assigner_id })
+    }
+
+    pub fn value(&self) -> i32 {
+        self.assigner_id
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(transparent)]
+pub struct AssignerName {
+    name: String,
+}
+
+impl AssignerName {
+    pub fn value(&self) -> &str {
+        &self.name
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(transparent)]
+pub struct Description {
+    description: String,
+}
+
+impl Description {
+    #[allow(dead_code)]
+    pub fn new(s: &str) -> Self {
+        Self {
+            description: s.to_string(),
+        }
+    }
+
+    pub fn value(&self) -> &str {
+        &self.description
+    }
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(transparent)]
+pub struct TaskStateId {
+    task_state_id: i32,
+}
+
+impl TaskStateId {
+    #[allow(dead_code)]
+    pub fn new(s: &str) -> Result<Self> {
+        let task_state_id = s
+            .parse()
+            .with_context(|| format!("task_state_id は数値で入力してください: '{}'", s))?;
+        Ok(Self { task_state_id })
+    }
+
+    pub fn value(&self) -> i32 {
+        self.task_state_id
+    }
+}
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[allow(dead_code)]
@@ -20,84 +133,6 @@ pub struct TaskReq {
     project_id: ProjectId,
     task_state_id: TaskStateId,
 }
-
-// ============================================================
-// Response structs
-// ============================================================
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct TaskRes {
-    id: TaskId,
-    content: Content,
-    description: Option<Description>,
-    due_at: DateTime<Utc>,
-    created_at: DateTime<Utc>,
-    updated_at: DateTime<Utc>,
-    creator: Creator,
-    assigner: Assigner,
-    project: Option<Project>,
-    tags: Vec<Tag>,
-    url: Url,
-}
-
-#[derive(Debug, Clone)]
-pub struct TaskResList {
-    tasks: Vec<TaskRes>,
-}
-
-// ============================================================
-// Nested structs
-// ============================================================
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(transparent)]
-pub struct Content {
-    content: String,
-}
-
-#[derive(Debug, Deserialize, Serialize, Clone)]
-pub struct Assigner {
-    id: AssignerId,
-    name: AssignerName,
-}
-
-// ============================================================
-// Newtype structs
-// ============================================================
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(transparent)]
-pub struct TaskId {
-    id: u32,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(transparent)]
-pub struct AssignerId {
-    assigner_id: i32,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(transparent)]
-pub struct AssignerName {
-    name: String,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(transparent)]
-pub struct Description {
-    description: String,
-}
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
-#[serde(transparent)]
-pub struct TaskStateId {
-    task_state_id: i32,
-}
-
-// ============================================================
-// impl Task
-// ============================================================
 
 impl TaskReq {
     #[allow(dead_code)]
@@ -144,9 +179,36 @@ impl TaskReq {
     }
 }
 
-// ============================================================
-// impl TaskRes
-// ============================================================
+impl Printable for TaskReq {
+    fn get_print_fields(&self) -> Vec<print_service::PrintField> {
+        vec![
+            print_service::PrintField::new("assigner_id", &self.assigner_id().value().to_string()),
+            print_service::PrintField::new("content", self.content().value()),
+            print_service::PrintField::new("due_at", &self.due_at().to_string()),
+            print_service::PrintField::new("description", self.description().value()),
+            print_service::PrintField::new("project_id", &self.project_id().value().to_string()),
+            print_service::PrintField::new(
+                "task_state_id",
+                &self.task_state_id().value().to_string(),
+            ),
+        ]
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct TaskRes {
+    id: TaskId,
+    content: Content,
+    description: Option<Description>,
+    due_at: DateTime<Utc>,
+    created_at: DateTime<Utc>,
+    updated_at: DateTime<Utc>,
+    creator: Creator,
+    assigner: Assigner,
+    project: Option<Project>,
+    tags: Vec<Tag>,
+    url: Url,
+}
 
 impl TaskRes {
     #[allow(dead_code)]
@@ -223,129 +285,13 @@ impl TaskRes {
     }
 }
 
-// ============================================================
-// impl TaskResList
-// ============================================================
-
-impl TaskResList {
-    pub fn new(tasks: Vec<TaskRes>) -> Self {
-        Self { tasks }
-    }
-
-    pub fn tasks(&self) -> &Vec<TaskRes> {
-        &self.tasks
-    }
-}
-
-// ============================================================
-// impl newtype structs
-// ============================================================
-
-impl Content {
-    pub fn value(&self) -> &str {
-        &self.content
-    }
-}
-
-impl TaskId {
-    pub fn value(&self) -> u32 {
-        self.id
-    }
-}
-
-impl AssignerId {
-    #[allow(dead_code)]
-    pub fn new(s: &str) -> Result<Self, String> {
-        let assigner_id = s
-            .parse()
-            .map_err(|_| "assigner_id は数値で入力してください。".to_string())?;
-        Ok(Self { assigner_id })
-    }
-
-    pub fn value(&self) -> i32 {
-        self.assigner_id
-    }
-}
-
-impl AssignerName {
-    pub fn value(&self) -> &str {
-        &self.name
-    }
-}
-
-impl Description {
-    #[allow(dead_code)]
-    pub fn new(s: &str) -> Self {
-        Self {
-            description: s.to_string(),
-        }
-    }
-
-    pub fn value(&self) -> &str {
-        &self.description
-    }
-}
-
-impl TaskStateId {
-    #[allow(dead_code)]
-    pub fn new(s: &str) -> Result<Self, String> {
-        let task_state_id = s
-            .parse()
-            .map_err(|_| "task_state_id は数値で入力してください。".to_string())?;
-        Ok(Self { task_state_id })
-    }
-
-    pub fn value(&self) -> i32 {
-        self.task_state_id
-    }
-}
-
-// ============================================================
-// impl nested structs
-// ============================================================
-
-impl Assigner {
-    #[allow(dead_code)]
-    pub fn new(id: AssignerId, name: AssignerName) -> Self {
-        Self { id, name }
-    }
-
-    pub fn id(&self) -> &AssignerId {
-        &self.id
-    }
-
-    pub fn name(&self) -> &AssignerName {
-        &self.name
-    }
-}
-
-// ============================================================
-// Printable impls
-// ============================================================
-
-impl Printable for TaskReq {
-    fn get_print_fields(&self) -> Vec<print_service::PrintField> {
-        vec![
-            print_service::PrintField::new("assigner_id", &self.assigner_id().value().to_string()),
-            print_service::PrintField::new("content", self.content().value()),
-            print_service::PrintField::new("due_at", &self.due_at().to_string()),
-            print_service::PrintField::new("description", self.description().value()),
-            print_service::PrintField::new("project_id", &self.project_id().value().to_string()),
-            print_service::PrintField::new(
-                "task_state_id",
-                &self.task_state_id().value().to_string(),
-            ),
-        ]
-    }
-}
-
 impl Printable for TaskRes {
     fn get_print_fields(&self) -> Vec<print_service::PrintField> {
         vec![
             print_service::PrintField::new("id", &self.id().value().to_string()),
             print_service::PrintField::new("content", self.content().value()),
             print_service::PrintField::new(
-                "Description",
+                "description",
                 self.description()
                     .map(|d| d.value())
                     .unwrap_or_else(|| "None"),
@@ -361,7 +307,7 @@ impl Printable for TaskRes {
             ),
             print_service::PrintField::new("assigner_name", self.assigner().name().value()),
             print_service::PrintField::new(
-                "project_id",
+                "project_name",
                 self.project()
                     .map(|p| p.name().value())
                     .unwrap_or_else(|| "None"),
@@ -380,6 +326,21 @@ impl Printable for TaskRes {
             ),
             print_service::PrintField::new("url", self.url().value()),
         ]
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct TaskResList {
+    tasks: Vec<TaskRes>,
+}
+
+impl TaskResList {
+    pub fn new(tasks: Vec<TaskRes>) -> Self {
+        Self { tasks }
+    }
+
+    pub fn tasks(&self) -> &Vec<TaskRes> {
+        &self.tasks
     }
 }
 

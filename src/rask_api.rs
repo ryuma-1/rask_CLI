@@ -1,16 +1,27 @@
 use reqwest::blocking::{Client, Response};
+use thiserror::Error;
 
-use anyhow::{Context, Result};
+#[derive(Debug, Error)]
+pub enum RaskError {
+    #[error("指定した id のタスクが見つかりませんでした (id: {0})")]
+    TaskNotFound(i32),
+    #[error("指定した id のドキュメントが見つかりませんでした (id: {0})")]
+    DocNotFound(i32),
+    #[error("API エラー: status={status}, body={body}")]
+    ApiError { status: u16, body: String },
+    #[error(transparent)]
+    Http(#[from] reqwest::Error),
+}
 
 pub trait RaskApi {
-    fn get_all_tasks(&self) -> Result<Response>;
-    fn get_task(&self, path: i32) -> Result<Response>;
+    fn get_all_tasks(&self) -> Result<Response, RaskError>;
+    fn get_task(&self, id: i32) -> Result<Response, RaskError>;
     #[allow(dead_code)]
-    fn create_task(&self, data: serde_json::Value) -> Result<Response>;
-    fn get_all_docs(&self) -> Result<Response>;
-    fn get_doc(&self, path: i32) -> Result<Response>;
+    fn create_task(&self, data: serde_json::Value) -> Result<Response, RaskError>;
+    fn get_all_docs(&self) -> Result<Response, RaskError>;
+    fn get_doc(&self, id: i32) -> Result<Response, RaskError>;
     #[allow(dead_code)]
-    fn create_doc(&self, data: serde_json::Value) -> Result<Response>;
+    fn create_doc(&self, data: serde_json::Value) -> Result<Response, RaskError>;
 }
 
 pub struct RaskApiClient {
@@ -29,68 +40,83 @@ impl RaskApiClient {
     }
 }
 
+fn check_response(res: Response) -> Result<Response, RaskError> {
+    let status = res.status();
+    if !status.is_success() {
+        let code = status.as_u16();
+        let body = res.text().unwrap_or_default();
+        return Err(RaskError::ApiError { status: code, body });
+    }
+    Ok(res)
+}
+
 impl RaskApi for RaskApiClient {
-    fn get_all_tasks(&self) -> Result<Response> {
-        let res: Response = self
+    fn get_all_tasks(&self) -> Result<Response, RaskError> {
+        let res = self
             .client
             .get(&format!("{}/tasks.json?api_token={}", self.url, self.token))
-            .send()
-            .context("API: Show all tasks との接続に失敗しました")?;
+            .send()?;
 
-        Ok(res)
+        check_response(res)
     }
 
-    fn get_task(&self, path: i32) -> Result<Response> {
+    fn get_task(&self, id: i32) -> Result<Response, RaskError> {
         let res = self
             .client
             .get(&format!(
                 "{}/tasks/{}.json?api_token={}",
-                self.url, path, self.token
+                self.url, id, self.token
             ))
-            .send()
-            .context("API: Show a task との接続に失敗しました")?;
+            .send()?;
 
-        Ok(res)
+        // 404 → TaskNotFound に変換
+        if res.status().as_u16() == 404 {
+            return Err(RaskError::TaskNotFound(id));
+        }
+
+        check_response(res)
     }
 
-    fn create_task(&self, data: serde_json::Value) -> Result<Response> {
+    fn create_task(&self, data: serde_json::Value) -> Result<Response, RaskError> {
         let res = self
             .client
             .post(&format!("{}/tasks.json?api_token={}", self.url, self.token))
             .json(&data)
-            .send()
-            .context("API: Create new task との接続に失敗しました")?;
+            .send()?;
 
-        Ok(res)
+        check_response(res)
     }
 
-    fn get_all_docs(&self) -> Result<Response> {
+    fn get_all_docs(&self) -> Result<Response, RaskError> {
         let res = self
             .client
             .get(&format!(
                 "{}/documents.json?api_token={}",
                 self.url, self.token
             ))
-            .send()
-            .context("API: Show all documents との接続に失敗しました")?;
+            .send()?;
 
-        Ok(res)
+        check_response(res)
     }
 
-    fn get_doc(&self, path: i32) -> Result<Response> {
+    fn get_doc(&self, id: i32) -> Result<Response, RaskError> {
         let res = self
             .client
             .get(&format!(
                 "{}/documents/{}.json?api_token={}",
-                self.url, path, self.token
+                self.url, id, self.token
             ))
-            .send()
-            .context("API: Show a document との接続に失敗しました")?;
+            .send()?;
 
-        Ok(res)
+        // 404 → DocNotFound に変換
+        if res.status().as_u16() == 404 {
+            return Err(RaskError::DocNotFound(id));
+        }
+
+        check_response(res)
     }
 
-    fn create_doc(&self, json: serde_json::Value) -> Result<Response> {
+    fn create_doc(&self, json: serde_json::Value) -> Result<Response, RaskError> {
         let res = self
             .client
             .post(&format!(
@@ -98,9 +124,8 @@ impl RaskApi for RaskApiClient {
                 self.url, self.token
             ))
             .json(&json)
-            .send()
-            .context("API: Create new document との接続に失敗しました")?;
+            .send()?;
 
-        Ok(res)
+        check_response(res)
     }
 }

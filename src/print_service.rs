@@ -1,10 +1,5 @@
 use anyhow::{Context, Result};
 
-pub struct PrintField {
-    pub key: String,
-    pub value: String,
-}
-
 pub trait Printable {
     fn get_print_fields(&self) -> Vec<PrintField>;
 }
@@ -13,7 +8,10 @@ pub trait PrintableList {
     fn get_printable_list(&self) -> Vec<Box<dyn Printable>>;
 }
 
-pub struct PrintService;
+pub struct PrintField {
+    pub key: String,
+    pub value: String,
+}
 
 impl PrintField {
     pub fn new(key: impl Into<String>, value: impl Into<String>) -> Self {
@@ -23,6 +21,8 @@ impl PrintField {
         }
     }
 }
+
+pub struct PrintService;
 
 impl PrintService {
     pub fn new() -> Self {
